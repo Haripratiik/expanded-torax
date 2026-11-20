@@ -1,135 +1,32 @@
-# Expanded TORAX
+[![quick start](https://github.com/Haripratiik/expanded-torax/actions/workflows/quickstart.yml/badge.svg)](https://github.com/Haripratiik/expanded-torax/actions/workflows/quickstart.yml)
 
-A whole-device tokamak simulator built on [TORAX](https://github.com/google-deepmind/torax) 1.4.3, with the physics a control test needs coupled to it, and a harness that lets a script, an AI agent or a person drive the plasma while it runs.
+## What is Expanded TORAX?
 
-I built it to test real-time control chips and neural surrogates: on plasmas checked against real MAST shots, and on ITER, SPARC and MAST-U, which no shot here can check and which are labelled as such.
+Expanded TORAX is a whole-device tokamak simulator for testing real-time plasma control. It runs [TORAX](https://github.com/google-deepmind/torax) 1.4.3, Google DeepMind's core transport simulator, without modifying it, and couples to each TORAX step the physics a control test needs: magnetic islands, ELMs, sawteeth, L-H transitions, neutral beams, the edge pedestal, radiation, a free boundary and synthetic sensors. A harness lets a script, an AI agent or a person drive the plasma while it runs. Expanded TORAX is written in Python, with the following motivations:
 
-**Status.** Version 12 of the plasma settings, frozen on 9 November 2026, in package release 1.2. It runs whole MAST shots hands-off from their first measured frame and meets 6 of the 12 accuracy bars set for it, one of which, the plasma current, is given as the programme. It is a test bench whose limits are measured, not a twin that matches shots: read [How far to trust it](#how-far-to-trust-it) before using any number it gives. The ITER and test scenarios run from this repository as they are; the MAST results need shot files that cannot yet be rebuilt from it alone ([MAST shots](#mast-shots)).
+- Closed-loop tests of controllers, decision models and neural surrogates, on plasmas whose accuracy is measured against real MAST shots, and on ITER, SPARC and MAST-U, which no shot here checks and which are labelled as such
+- Exact branches: a snapshot holds everything a step reads, so two actions can be compared from the same plasma state
+- One set of named commands for scripts, a local server, a browser front end and Python
+- Every model tagged by its level (TORAX's own, a published reduced equation, a published multi-machine law, or a prescribed what-if), with no law fitted to MAST in the general code
 
-New to tokamaks? [Words used here](#words-used-here) explains the terms.
+Expanded TORAX, at release 1.2, has the following physics and harness feature set (modules in `core/`):
 
-## Contents
+- Core transport from TORAX: heat, particles and current on the plasma's flux surfaces, a 1.5D model with the shape given
+- Neoclassical tearing modes (magnetic islands) from the modified Rutherford equation with published terms: growth, rotation, braking and locking, seeded by sawteeth, ELMs and beta collapses, and shrunk by ECCD (`ntm.py`)
+- Type I ELMs from the exhaust power, and Porcelli's sawtooth trigger with its thermal terms (`ntm.py`, `porcelli.py`, `coupled.py`)
+- L-H transitions from Martin 2008 with a low-aspect-ratio term, and Piccione's no-wall beta limit at low aspect ratio (`lh_general.py`, `coupled.py`)
+- Neutral beams with fast-ion slowing down and neutrons from the fast ions present, with optional atomic physics rebuilt from published sources (`beams.py`, `beam_atomic.py`)
+- The edge pedestal's height and width from EPED-NN, whose weights ship in `data/epednn` (`epednn.py`, `pedestal.py`)
+- Density held on the machine's programme by a source with integral action, and published particle transport ratios (`coupled.py`)
+- Impurities, dilution and line radiation (carbon out of coronal balance), and a bolometer reading that includes the scrape-off layer, the divertor and hydrogen (`impurities.py`, `radiation.py`, `edge_radiation.py`, `sol.py`)
+- 21 actuator and instability commands, each tagged by level: pellets, shattered pellets, gas, laser blow-off, beams, ICRH, ECRH, RMP coils, current ramps, density and radiation loops, a disruption mitigation trigger, fishbones, Alfven modes, wall flakes, MARFEs, back transitions, transport barriers, resistive wall modes, vertical displacements and operating limits (`actuators.py`)
+- Synthetic sensors read from the simulated plasma: magnetic probes and flux loops, line density, neutrons and the bolometers' total (`sensors.py`, `radiation.py`)
+- Decision models: a rule, an island-equation controller, a forecaster (its trained weights are not included), or a Python function of your own (`controllers.py`, `forecaster.py`)
+- Optional pieces, each in its own process: the free boundary from FreeGSNKE 3.1.1 with vessel currents from their circuit, fuelling by neutrals from KN1D, and the disruption after its onset in 2D with FreeGSNKE on MAST or in 1D with DREAM elsewhere (`freeboundary.py`, `neutrals.py`, `mast_vde.py`, `dream_iter.py`)
+- Real shots: MAST shots run hands-off from their first measured frame and scored against what MAST measured (`natural.py`, `whole_shot.py`, `readiness.py`)
+- A browser front end with live traces, profile maps, the cross-section, the console of actuators and instabilities, branches, and MAST's measurements beside a real shot (`studio.py`, `studio/`)
 
-- [Quick start](#quick-start)
-- [Next steps](#next-steps)
-- [What it adds to TORAX](#what-it-adds-to-torax)
-- [How a step works](#how-a-step-works)
-- [Scenarios](#scenarios)
-- [The harness](#the-harness)
-- [The front end](#the-front-end)
-- [How far to trust it](#how-far-to-trust-it)
-- [MAST shots](#mast-shots)
-- [Optional pieces](#optional-pieces)
-- [Where things live](#where-things-live)
-- [Checks](#checks)
-- [Releases](#releases)
-- [Words used here](#words-used-here)
-- [Credits and license](#credits-and-license)
-
-## Quick start
-
-TORAX needs Python 3.11 or newer; this was developed and tested on Python 3.13, on Windows 11, and the repository's CI runs the quick start on Ubuntu. Commands are written for Git Bash or a Linux or macOS shell.
-
-```bash
-git clone https://github.com/Haripratiik/expanded-torax.git
-cd expanded-torax
-python -m venv .venv
-```
-
-Activate the environment (`.venv\Scripts\activate` on Windows, `source .venv/bin/activate` elsewhere), then install:
-
-```bash
-pip install -r requirements.txt
-```
-
-`requirements.txt` pins TORAX 1.4.3 and the JAX it was tested with. `requirements-lock.txt` pins every package of the tested environment, if you want exactly that.
-
-Check what is there and what each piece enables:
-
-```bash
-python xtorax.py env
-```
-
-Only TORAX's environment and `data/epednn` are needed for the ITER and test scenarios that have no free boundary; everything else is optional ([Optional pieces](#optional-pieces)).
-
-A first run, about a minute (the first step compiles TORAX's step with JAX):
-
-```bash
-python examples/run_iter.py
-```
-
-```text
-settled flat top           t  40.0 s   fusion   423 MW   Q  8.3   2/1 island  0.0 cm   ECCD  0.0 MW
-3 s after a 4 cm island    t  43.0 s   fusion   414 MW   Q  5.8   2/1 island  2.4 cm   ECCD 20.0 MW
-the same 3 s, no island    t  43.0 s   fusion   417 MW   Q  8.2   2/1 island  0.0 cm   ECCD  0.0 MW
-```
-
-The script runs ITER's hybrid scenario to 40 s, past the first 25 s, in which the scenario lets current diffuse 200 times faster to settle (as TORAX's own example does). It saves a snapshot, seeds a 4 cm 2/1 island and runs 3 s, then restores the snapshot and runs the same 3 s without the island. The scenario's rule fires 20 MW of ECCD at an island wider than 3 cm and holds it on for 3 s. The island is gone within a second; the 2.4 cm at 43 s is a new island, seeded at about 42 s. Fusion power barely moves (414 against 417 MW), but the 20 MW of ECCD takes Q from 8.2 to 5.8. Both branches start from the same state, so the difference is the island and the ECCD it set off.
-
-The same session as a list of harness commands, and the front end on the same plasma:
-
-```bash
-python xtorax.py script studio_iter examples/iter_quickstart.json
-```
-
-```bash
-python xtorax.py studio --scenario studio_iter
-```
-
-The front end opens at http://127.0.0.1:8801. It is ready in about a minute, while TORAX's step compiles; then press Run.
-
-## Next steps
-
-**Your own controller.** A decision model is a Python function. `examples/my_decision.py` fires full ECCD on the largest island while it is wider than 2 cm:
-
-```python
-def make(P_max, physics, on_cm=2.0):
-    def decide(obs):
-        w, rho = obs["w"][0], obs["rho"][0]
-        aim = rho if rho == rho else 0.5             # no island found: park the mirror mid-radius
-        return (P_max if w * 100 > on_cm else 0.0), aim
-    return decide
-```
-
-The harness calls `make` once and `decide` after every TORAX step, with the islands' widths in metres (largest first) and their surfaces in rho, and takes back the gyrotron power in MW and where to aim it. Run it on the quick start's plasma:
-
-```bash
-python xtorax.py script studio_iter examples/my_decision_session.json
-```
-
-It removes the 4 cm island within a second and switches the gyrotrons off; at 43 s the plasma has no island, no ECCD and Q 8.2.
-
-**An agent at the controls.** `python xtorax.py serve studio_iter` puts the same commands behind a local server ([The harness](#the-harness)), and [AGENTS.md](AGENTS.md) is the manual to hand the agent.
-
-**Real shots.** The MAST checks need shot files made from FAIR-MAST's data ([MAST shots](#mast-shots)).
-
-## What it adds to TORAX
-
-TORAX evolves heat, particles and current on the plasma's flux surfaces (a 1.5D model: profiles across the radius, with the shape given). Expanded TORAX couples to it what a control test needs. Each part is tagged with its level: TORAX's own model, a published reduced equation, a published multi-machine law, or a prescribed effect (an assumed what-if).
-
-| Part | What it does | Level | Module |
-|---|---|---|---|
-| Core transport | heat, particles and current on flux surfaces | TORAX | TORAX, `run_ntm.py` |
-| Islands | neoclassical tearing modes: growth, rotation, braking, locking; seeds from sawteeth, ELMs and beta collapses | reduced (modified Rutherford equation with published terms) | `ntm.py` |
-| ELMs, sawteeth | the ELM cycle from the exhaust power; Porcelli's sawtooth trigger (thermal terms) | reduced | `ntm.py`, `porcelli.py`, `coupled.py` |
-| L-H transitions, beta limit | Martin 2008 with a low-aspect-ratio term; Piccione's no-wall limit at low aspect ratio | published laws | `lh_general.py`, `coupled.py` |
-| Neutral beams | fast ions with slowing down, neutrons from the fast ions present; optional rebuilt atomic physics | reduced | `beams.py`, `beam_atomic.py` |
-| Free boundary (optional) | the plasma's shape from measured or programmed coil currents every 10 ms, vessel currents from their circuit, the start checked against EFIT | FreeGSNKE 3.1.1 in its own process | `freeboundary.py`, `freegsnke_server.py`, `mast_machine.py`, `vessel.py` |
-| Pedestal | height and width of the edge pedestal from EPED-NN | open model, weights in `data/epednn` | `epednn.py`, `pedestal.py` |
-| Density | held on the machine's programme by a source shaped like the profile, with integral action; published particle transport (D from 0.4 to 0.67 of chi, AUG and JET) | a control idealization plus published ratios | `coupled.py`, `ntm.py` |
-| Impurities, radiation | composition, dilution, line radiation (carbon out of coronal balance), and a bolometer reading that includes the scrape-off layer, divertor and hydrogen its view sees | TORAX plus reduced models | `impurities.py`, `radiation.py`, `edge_radiation.py`, `sol.py` |
-| Fuelling by neutrals (optional) | KN1D from MAST's measured wall pressure: an oracle, not hands-off | KN1DPy in its own process | `neutrals.py`, `kn1d_server.py` |
-| Actuators and instabilities | 21 commands: pellets, shattered pellets, gas, beams, heating, RMP coils, current ramps, density and radiation loops, fishbones, Alfven modes, MARFEs, back transitions, wall flakes, RWMs, VDEs, limits | each tagged torax, reduced, prescribed or margin | `actuators.py` |
-| After a disruption | `quench`: on MAST, FreeGSNKE in 2D (which way the plasma goes); elsewhere DREAM | 2D or 1D codes | `mast_vde.py`, `dream_iter.py` |
-| Sensors | magnetic probes and flux loops, line density, neutrons and the bolometers' total, read from the simulated plasma | synthetic diagnostics | `sensors.py`, `radiation.py` |
-| Decision models | a rule, an island-equation controller, a forecaster (its trained weights are not included), or your own Python function | outside models | `controllers.py`, `forecaster.py` |
-| Harness | named commands from a script, a local server or the front end; branches (snapshot and restore) | | `twin.py`, `harness.py` |
-| Front end | live traces, profile maps, the cross-section, the console of actuators and instabilities, branches, measured data beside a real shot | | `studio.py`, `studio/` |
-| Real shots | MAST shots from their first frame, hands-off; scoring against MAST; the readiness check | | `natural.py`, `mast.py`, `shot.py`, `whole_shot.py`, `readiness.py` |
-
-## How a step works
-
-One step of the loop, in outline:
+### How a step works
 
 ```mermaid
 flowchart LR
@@ -144,7 +41,206 @@ flowchart LR
     F["FreeGSNKE, optional,<br/>in its own process"] <--> R
 ```
 
-A scenario file sets the machine, the plasma and the models. Each TORAX step (0.1 s on ITER, 1 ms on MAST) is followed by the coupled models, which read TORAX's profiles and write back what they change: an island's width flattens the profiles across it, an ELM or a sawtooth crash removes energy, the pedestal model resets the edge. The sensors read the result, the decision model chooses, and the actuators act before the next step. Commands arrive between steps. A snapshot holds everything a step reads, so within one process a restored branch repeats the first run exactly.
+A scenario file sets the machine, the plasma and the models. Each TORAX step (0.1 s on ITER, 1 ms on MAST) is followed by the coupled models, which read TORAX's profiles and write back what they change: an island flattens the profiles across it, an ELM or a sawtooth crash removes energy, the pedestal model resets the edge. The sensors read the result, the decision model chooses, and the actuators act before the next step. Commands arrive between steps. A snapshot holds everything a step reads, so within one process a restored branch repeats the first run exactly.
+
+### Status
+
+Every number in this README was measured on this code unless it says inferred. Release 1.2 runs version 12 of the plasma settings, frozen on 9 November 2026. On whole MAST shots run hands-off it meets 6 of the 12 accuracy bars set for it, one of which, the plasma current, is given as the programme. It is a test bench with measured limits and does not match shots closely enough to stand in for MAST: read [How far to trust it](#how-far-to-trust-it) before using any number it gives. The ITER and test scenarios run from this repository as they are; the MAST results need shot files that cannot yet be rebuilt from it alone ([MAST shots](#mast-shots)).
+
+New to tokamaks? [Terms](#terms) explains the words used here.
+
+Expanded TORAX is an independent project, not affiliated with or endorsed by Google DeepMind or the UK Atomic Energy Authority.
+
+## Installation guide
+
+### Requirements
+
+Install Python 3.11 or greater, as TORAX requires, and Git. Expanded TORAX is developed and tested on Python 3.13 on Windows 11, and its CI runs on Ubuntu. The commands below are for a Linux or macOS shell, or Git Bash on Windows.
+
+### How to install
+
+#### Prepare a virtual environment
+
+```shell
+git clone https://github.com/Haripratiik/expanded-torax.git
+cd expanded-torax
+python -m venv .venv
+source .venv/bin/activate
+```
+
+On Windows the environment activates with `source .venv/Scripts/activate` in Git Bash, or `.venv\Scripts\activate` in PowerShell or cmd.
+
+#### Install the requirements
+
+```shell
+pip install -r requirements.txt
+```
+
+`requirements.txt` pins TORAX 1.4.3 and the JAX it was tested with. `requirements-lock.txt` pins every package of the tested environment, for an exact copy.
+
+You can check what is in place, and what each piece enables:
+
+```shell
+python xtorax.py env
+```
+
+TORAX's environment and `data/epednn` are all that the ITER and test scenarios without a free boundary need; every other piece is optional ([Optional pieces](#optional-pieces)).
+
+### Running an example
+
+The following command runs ITER's hybrid scenario, branches it, and prints three states. It takes about a minute; the first step compiles TORAX's step with JAX.
+
+```shell
+python examples/run_iter.py
+```
+
+```text
+settled flat top           t  40.0 s   fusion   423 MW   Q  8.3   2/1 island  0.0 cm   ECCD  0.0 MW
+3 s after a 4 cm island    t  43.0 s   fusion   414 MW   Q  5.8   2/1 island  2.4 cm   ECCD 20.0 MW
+the same 3 s, no island    t  43.0 s   fusion   417 MW   Q  8.2   2/1 island  0.0 cm   ECCD  0.0 MW
+```
+
+The script runs the scenario to 40 s, past the first 25 s, in which the scenario lets current diffuse 200 times faster to settle (as TORAX's own example does). It saves a snapshot, seeds a 4 cm 2/1 island and runs 3 s, then restores the snapshot and runs the same 3 s without the island. The scenario's rule fires 20 MW of ECCD at an island wider than 3 cm and holds it on for 3 s. The island is gone within a second; the 2.4 cm at 43 s is a new island, seeded at about 42 s. Fusion power barely moves (414 against 417 MW), but the 20 MW of ECCD takes Q from 8.2 to 5.8. Both branches start from the same state, so the difference is the island and the ECCD it set off.
+
+The same session as a list of harness commands, each answer printed as JSON:
+
+```shell
+python xtorax.py script studio_iter examples/iter_quickstart.json
+```
+
+The other examples, with what each needs beyond the requirements:
+
+| Command | What it runs | Needs |
+|---|---|---|
+| `python xtorax.py script studio_iter examples/my_decision_session.json` | a decision model of your own ([Writing a decision model](#writing-a-decision-model)) | nothing more |
+| `python xtorax.py studio --scenario studio_iter` | the front end on the same plasma ([The front end](#the-front-end)) | nothing more |
+| `python xtorax.py script studio_iter examples/agent_session.json` | an island, a branch, a shattered pellet and the quench | DREAM |
+| `python xtorax.py script studio_mast_handsoff_20689 examples/mast_session.json` | MAST shot 20689 hands-off, through harness commands | MAST shot files, FreeGSNKE |
+| `python examples/run_shot.py [shot] [ms]` | a MAST shot hands-off from Python (default 20689, 30 ms) | MAST shot files, FreeGSNKE |
+
+#### Set environment variables
+
+Results, MAST data and outside tools live in a workspace: the repository itself, unless `XTORAX_HOME` names another folder. Results and data go in its `runs/twin/`, outside tools in its `external/`; git ignores both. Each variable below names one piece's Python or folder; without it, the tools look in the workspace.
+
+| Variable | Default | What it sets |
+|---|---|---|
+| `XTORAX_HOME` | the repository | the workspace |
+| `XTORAX_PYTHON` | `external/torax-venv` if present, else the Python running `xtorax.py` | the Python that `xtorax.py` runs its own jobs with |
+| `XTORAX_FREEGSNKE_PYTHON` | `external/freegsnke-venv` | FreeGSNKE's Python |
+| `XTORAX_FREEGSNKE_SRC` | `external/freegsnke` | FreeGSNKE's source, which the server imports |
+| `XTORAX_KN1D_PYTHON` | `external/kn1d-venv` | KN1DPy's Python |
+| `XTORAX_DREAM_PYTHON` | `python3` | the Python that runs DREAM (in WSL on Windows) |
+| `XTORAX_DREAMPATH` | `$HOME/DREAM` | DREAM's build |
+| `XTORAX_FAIRMAST_PYTHON` | `external/fairmast-venv` | the Python with zarr, for the MAST tools |
+| `XTORAX_MAST_STORE` | `~/data/mast/tokamark_v1` | the local copy of FAIR-MAST's TokaMark v1 data |
+| `XTORAX_EPEDNN` | `data/epednn` | EPED-NN's weights |
+
+An environment in `external/` is found at `Scripts/python.exe` on Windows and `bin/python` elsewhere. `python xtorax.py env` reports what it finds. TORAX's own variables, such as JAX's compilation cache, work as [TORAX's README](https://github.com/google-deepmind/torax#set-environment-variables) describes.
+
+#### Set flags
+
+`xtorax.py` is the entry point; `python xtorax.py --help` lists its commands.
+
+| Command | Flags |
+|---|---|
+| `serve SCENARIO` | `--port` (default 8801); `--allow-python` accepts the decision kind `python`, which runs a named Python function |
+| `studio` | `--scenario NAME` (default: MAST shot 20689 hands-off if the workspace has its files, else `studio_iter`); `--port`; `--allow-python` |
+| `call JSON` | `--port` |
+| `run SHOT ...` | `--scorable` (every scorable shot), `--version V`, `--tag TAG`, `--seeds N`, `--lanes N` (up to 3 processes), `--extra JSON` (override keys added to the version's) |
+| `score TAG` | `--name NAME` |
+| `ready NAME` | `--version V` |
+| `shots` | `--all` (also the shots that cannot be scored) |
+| `smoke` | `--limit` (seconds per check, default 3600) |
+
+### Running the checks
+
+```shell
+python xtorax.py smoke
+```
+
+runs the functional checks one after another and writes pass or fail to `runs/twin/smoke/summary.txt`. On a clean workspace the reactor, plant, pellet and edge checks run, in about 4 minutes, and the three that need FreeGSNKE or MAST shot files are reported as skipped; the CI runs it on every push. Each check also runs on its own:
+
+| Check | What it shows |
+|---|---|
+| `python core/check_reactor.py` | the steppable reactor against saved traces of the same setup, a branch repeated bit for bit, and each edit doing what it says |
+| `python core/check_plant.py` | every actuator does what it says, on branches of one ITER plasma |
+| `python core/check_coupled.py [--mast]` | EPED-NN, FreeGSNKE, the growth rate, a heating step and branches through the harness's commands |
+| `python core/check_branches.py [--case mast iter]` | branches come back exactly: a snapshot, a run, a branch with a pellet, gas, an island and heating fired, back to the snapshot, the same run again; every record must match the first run's |
+| `python core/check_quench.py` | `quench` on a MAST shot and on ITER |
+| `python core/epednn.py check` | EPED-NN's outputs against EPEDNN.jl's on the same inputs |
+| `python xtorax.py ready NAME` | a scored set of MAST runs against the readiness criteria |
+
+### Outputs
+
+- `script` prints each command's answer as JSON, and `serve` returns it over HTTP.
+- `{"cmd": "save", "path": "run.npz"}` writes the time and every recorded quantity, one value per TORAX step, to that path.
+- In the front end, Save shot writes the session to `runs/twin/studio/<name>.json`, and saved shots can be overlaid in grey; the same panel downloads the traces as CSV and the scenario with its commands as JSON.
+- `run` writes `runs/twin/mast_natural2/<tag>/`: `results.jsonl` (one line per run: start, end, events, the free boundary's log), `<shot>_<seed>.npz` (scalars every step) and `<shot>_<seed>_prof.npz` (profiles).
+- `score` writes `runs/twin/whole82/summary.json` (`summary_<name>.json` with `--name`) and its figures in `runs/twin/whole82/figures/`.
+- `smoke` writes `runs/twin/smoke/summary.txt` and one log per check.
+
+### Cleaning up
+
+Leave the virtual environment with:
+
+```shell
+deactivate
+```
+
+Results stay in the workspace's `runs/` folder, which git ignores.
+
+### Optional pieces
+
+| Piece | For | Variables |
+|---|---|---|
+| FreeGSNKE 3.1.1 | the free boundary: `studio_iter_coupled`, the `twin_*` scenarios, hands-off MAST runs, `quench` on MAST | `XTORAX_FREEGSNKE_PYTHON`, `XTORAX_FREEGSNKE_SRC` |
+| KN1DPy | fuelling by neutrals, an oracle (option `fuelling: kn1d_gauge`) | `XTORAX_KN1D_PYTHON` |
+| DREAM | `quench` off MAST | `XTORAX_DREAM_PYTHON`, `XTORAX_DREAMPATH` |
+| zarr, scipy and requests | FAIR-MAST downloads and the MAST tools | `XTORAX_FAIRMAST_PYTHON`, `XTORAX_MAST_STORE` |
+| TurbulentTransport.jl's networks | the transport option `tglfnn_st`, tested on MAST and not adopted | none: the clone goes in `external/` |
+
+#### (Optional) Install FreeGSNKE
+
+FreeGSNKE runs in its own environment, since it needs numpy under 2.5. The server imports FreeGSNKE's source at commit `06be120`, because the 3.1.1 release cannot load ITER's machine:
+
+```shell
+python -m venv external/freegsnke-venv
+external/freegsnke-venv/bin/pip install freegsnke==3.1.1 "numpy<2.5"
+git clone https://github.com/FusionComputingLab/freegsnke.git external/freegsnke
+git -C external/freegsnke checkout 06be120
+```
+
+On Windows the environment's programs are in `external/freegsnke-venv/Scripts/`. `env/freegsnke-venv.txt` lists the tested Windows environment.
+
+#### (Optional) Install KN1DPy
+
+KN1DPy installs from its source into an environment of its own (`external/kn1d-venv`, or one that `XTORAX_KN1D_PYTHON` names). Its installer misses `jh_bscoef.npz`, which goes into `site-packages/KN1DPy/rates/johnson_hinnov/` by hand.
+
+#### (Optional) Install DREAM
+
+[DREAM](https://github.com/chalmersplasmatheory/DREAM) is built from source, inside WSL on Windows. `quench` runs it with `XTORAX_DREAM_PYTHON` from the build in `XTORAX_DREAMPATH`.
+
+#### (Optional) The MAST tools' environment
+
+```shell
+python -m venv external/fairmast-venv
+external/fairmast-venv/bin/pip install "zarr>=3" numcodecs requests scipy
+```
+
+`env/fairmast-venv.txt` lists the tested set for the downloads (zarr 3.4.2).
+
+#### (Optional) TGLF-NN for spherical tokamaks
+
+```shell
+git clone https://github.com/ProjectTorreyPines/TurbulentTransport.jl.git external/TurbulentTransport.jl
+python -I core/tglfnn_bson.py export sat3_em_mastu+nstx_azf-1_withnegD sat3_em_mastunearedge+nstxnearedge_azf-1_withnegD sat3_em_mastuedge+nstxedge_azf-1_withnegD
+```
+
+This reads the networks' Julia files without Julia and writes them to `runs/twin/tglfnn/`. A MAST run uses them with `--extra '{"base": "tglfnn_st"}'`.
+
+#### Not included
+
+The etched chip (decision model `etched`, through `XTORAX_CHIP_SERVER`), the 2D island solver and its surrogate (scenario key `plant2d`, with `solver/` and `models/` in the workspace) and the hardware flow that trains the forecaster's quantized form (`chip_forecaster.py`, `XTORAX_CHIP_PROJECT`) belong to a separate, unpublished project. The code that calls them stays, so their interfaces are documented; without them, those options stop with a message saying so.
 
 ## Scenarios
 
@@ -162,11 +258,11 @@ Scenarios are the JSON files in `scenarios/`. Name one without its `.json`.
 | `studio_mast_23906` | MAST shot 23906 from its real start, nothing measured afterwards | MAST shot files |
 | `studio_mast_handsoff_20689`, `studio_mast_handsoff_23906` | MAST shots run hands-off with version 12 | MAST shot files, FreeGSNKE |
 
-The `_v5` scenarios use version 5 of the island model. ITER, SPARC and MAST-U run from machine files (`core/machines.py`) and are beyond the range any shot here checks: report their numbers that way.
+The `_v5` scenarios use version 5 of the island model. ITER, SPARC and MAST-U run from machine files (`core/machines.py`) and are beyond the range any shot here checks: report their numbers that way. `core/twin.py`'s header lists every key a scenario file takes.
 
 ## The harness
 
-The same named commands reach a plasma three ways:
+The same named commands reach a plasma four ways:
 
 | Way | Command |
 |---|---|
@@ -188,15 +284,65 @@ The servers listen on 127.0.0.1 and answer this machine only: a request whose Ho
 | branches | `snapshot`, `restore`, `save` |
 | actuators and instabilities | `pellet`, `spi`, `gas`, `laser_blowoff`, `nbi`, `icrh`, `ecrh`, `rmp`, `ip`, `density_control`, `radiation_control`, `mitigation`, `fishbone`, `alfven`, `wall_flake`, `marfe`, `back_transition`, `transport_barrier`, `rwm`, `vde`, `limits` |
 
-`{"cmd": "help"}` lists every command with its parameters, defaults and ranges; [AGENTS.md](AGENTS.md) has them in tables, with the rules an agent should keep. The examples, each with the scenario it runs on: `python xtorax.py script studio_iter examples/iter_quickstart.json` (the quick start's session) and `python examples/run_iter.py` (the same from Python); `python xtorax.py script studio_iter examples/my_decision_session.json` (a decision model of your own); `python xtorax.py script studio_iter examples/agent_session.json` (an island, a branch, a shattered pellet and the quench, which needs DREAM); `python xtorax.py script studio_mast_handsoff_20689 examples/mast_session.json` and `python examples/run_shot.py` (a MAST shot hands-off, which needs MAST shot files).
+`{"cmd": "help"}` lists every command with its parameters, defaults and ranges. [AGENTS.md](AGENTS.md) has them in tables, with the rules an AI agent driving the harness should keep; hand it to the agent.
 
 ## The front end
 
-`python xtorax.py studio` serves a page at http://127.0.0.1:8801 with the plasma's live traces, profile maps, the cross-section, the console of actuators and instabilities, branches, and, on a real shot, what MAST measured beside the simulation. It starts on MAST shot 20689 if the workspace has its files, otherwise on `studio_iter`; `--scenario` picks another. It is drawn the way TORAX draws its own runs, in Plotly's style: dark by default (Plotly's plotly_dark template), and the Theme menu switches to Plotly's light template, the look of TORAX's figures.
+```shell
+python xtorax.py studio --scenario studio_iter
+```
+
+serves a page at http://127.0.0.1:8801 with the plasma's live traces, profile maps, the cross-section, the console of actuators and instabilities, branches (Mark, Back to, Rewind), and, on a real shot, what MAST measured beside the simulation. It is ready in about a minute, while TORAX's step compiles; then press Run. Without `--scenario` it starts on MAST shot 20689 if the workspace has its files, otherwise on `studio_iter`. It is drawn the way TORAX plots its runs, in Plotly's style: dark by default (Plotly's plotly_dark template), and the Theme menu switches to Plotly's light template.
+
+## Writing a decision model
+
+A decision model is a Python function. `examples/my_decision.py` fires full ECCD on the largest island while it is wider than 2 cm:
+
+```python
+def make(P_max, physics, on_cm=2.0):
+    def decide(obs):
+        w, rho = obs["w"][0], obs["rho"][0]
+        aim = rho if rho == rho else 0.5             # no island found: park the mirror mid-radius
+        return (P_max if w * 100 > on_cm else 0.0), aim
+    return decide
+```
+
+The harness calls `make` once and `decide` after every TORAX step. `decide` receives the islands' widths in metres (largest first) and their surfaces in rho, and returns the gyrotron power in MW and where to aim it. The session `examples/my_decision_session.json` makes it the decision model, passing `args` on to `make`:
+
+```json
+{"cmd": "decision", "spec": {"kind": "python", "target": "examples/my_decision.py:make", "args": {"on_cm": 2}}}
+```
+
+then seeds the quick start's 4 cm island at 40 s and runs 3 s:
+
+```shell
+python xtorax.py script studio_iter examples/my_decision_session.json
+```
+
+It removes the 4 cm island within a second and switches the gyrotrons off; at 43 s the plasma has no island, no ECCD and Q 8.2.
+
+## MAST shots
+
+A whole MAST shot needs files in the workspace's `runs/twin/`: the shot file and coil traces (`mast_natural2/shots/`, `coils/`), the start's extras (`mast_natural/extras/`), the instability laws (`mast_natural2/laws.json`), FreeGSNKE's MAST machine (`freeboundary/mast_machine2/`) and, for scoring, EFIT's signals (`whole82/real/`). They are made from FAIR-MAST's TokaMark v1 data (Jackson et al. 2024), which is public, by the tools in `core/`: `mast.py` and `mast_convert_natural.py` (profiles, equilibrium and programme), `mast_machine.py` (FreeGSNKE's machine), `mast_scalars.py`, `whole_shot_efit.py`, `mast_vde.py`, and `fairmast.py`, `gas_extract.py` and `beam_species.py` for extra signals. They read a local zarr copy of the data (`XTORAX_MAST_STORE`) in the MAST tools' environment. Two inputs came from a separate project's processing, and nothing here writes them yet: the shot catalogue (`mast_catalog/catalog.json`) and the choice of development shots. So the tools are included as they ran, the shot files are not distributed, and the MAST results cannot yet be rebuilt from this repository alone. The 25 scored shots are 15018, 15977, 16148, 16228, 16276, 16458, 17859, 18464, 18886, 20304, 20428, 20689, 20863, 21428, 21947, 22056, 22092, 22235, 22248, 22786, 24042, 24064, 24515, 24608 and 24627.
+
+With the files in place:
+
+| Command | What it does | Time |
+|---|---|---|
+| `python xtorax.py shots [--all]` | the shots that can be run, and those that can also be scored | seconds |
+| `python xtorax.py run SHOT ... \| --scorable [--version V] [--tag T] [--seeds N] [--lanes N] [--extra JSON]` | whole shots hands-off from their first frame, writing `runs/twin/mast_natural2/<tag>/` | 1 to 4 min a shot |
+| `python xtorax.py score TAG` | scores runs against MAST every 5 ms, beside holding the first frame | 1 to 2 min |
+| `python xtorax.py compare A B` | two scored sets on the same starts and times | 1 min |
+| `python xtorax.py ready NAME` | a scored set against the readiness criteria | 1 min |
+| `python xtorax.py versions` | every frozen version and the recommended one | seconds |
+
+A MAST run with FreeGSNKE takes 2 to 3 GB of memory, so run at most three at once.
+
+If the workspace keeps a list of development shots, `runs/twin/dev_shots.json` (`{"development": [shot, ...]}`), runs, scores and the MAST tools refuse every other shot, so shots held out for testing other work are never run by mistake. Without the file every shot with files may run.
 
 ## How far to trust it
 
-Everything in this section was measured unless it says inferred.
+Everything here was measured unless it says inferred. [VALIDATION.md](VALIDATION.md) has the full record: profiles, events and repeat runs, versions 9 to 12 compared, what sets each error, the options built and not adopted, earlier checks against real data, and the rules the physics keeps.
 
 ### Whole MAST shots, version 12
 
@@ -205,7 +351,7 @@ The main check. The 25 development MAST shots that can be scored, each run hands
 | Quantity | Error | Inside | Signed (10 to 90% of shots) | At the bar? |
 |---|---|---|---|---|
 | plasma current (given as the programme) | 2.3% | 99% | -2.3% (-6 to +1) | yes |
-| stored energy as MAST's EFIT reads it (whmd, from the twin's own equilibrium) | 6.4% | 73% | +3.7% (-7 to +12) | yes |
+| stored energy as MAST's EFIT reads it (whmd, from the simulation's own equilibrium) | 6.4% | 73% | +3.7% (-7 to +12) | yes |
 | q95 | 7.8% | 65% | -6.6% (-14 to +1) | yes |
 | minor radius | 2.7% | 99% | -1.3% (-4 to +4) | yes |
 | triangularity | 0.026 | 81% | -0.003 (-0.03 to +0.03) | yes |
@@ -217,188 +363,48 @@ The main check. The 25 development MAST shots that can be scored, each run hands
 | neutrons | 33.8% | 12% | +13% (-33 to +81) | no |
 | radiated power (the bolometers' total) | 76% low | 3% | -70% (-94 to -36) | no |
 
-Two more energies: the thermal energy against Thomson's kinetic energy, 21.6% per shot (signed -7%, -29 to +20); the thermal plus fast-ion energy against the energy EFIT's own beta_pol gives, signed +19% (-12 to +64; worst shot 240%), the fast-ion surplus described below.
-
-Profiles, relative RMS over 0.1 < rho < 0.9 against Thomson (T_e, n_e) and charge exchange (T_i), median over shots, with holding the first frame in brackets:
-
-| Profile | 5 ms | 20 ms | 50 ms | 100 ms | 200 ms |
-|---|---|---|---|---|---|
-| T_e | 9% (14) | 11% (27) | 17% (42) | 20% (58) | 21% (70) |
-| T_i | 17% (30) | 29% (50) | 41% (80) | 33% (91) | 35% (95) |
-| n_e | 12% (9) | 15% (16) | 15% (30) | 27% (47) | 14% (63) |
-
-The simulation beats holding the start from about 20 ms on, on all three.
-
-All 25 runs reach the end of their window; one (18464) disrupts on its own 41 ms early, from too many fast ions at low density. Events over the time both ran (simulated; measured): ELMs 271; 237, sawtooth crashes 85; 107, share of time with an n = 1 mode 0.43; 0.31, share in H-mode 0.29; 0.10. Within a factor 2 of MAST, share of shots: ELMs 36%, crashes 56%, n = 1 mode time 44%, H-mode time 32%; H-mode on 8 shots that stayed in L-mode. By the readiness criteria written before the work, version 12 meets the harness criterion only: runs (one self-disruption), quantities (6 of 12) and events (under two thirds of shots) are not met.
-
-Repeat runs: the same shot, version and seed run twice give the same numbers on some shots and not on others. 20689 scored identically; 16458 matched to the fifth digit at the start and then drifted (q95 error 3.0% against 3.3%, outer edge 5.2 against 5.3 cm). Code, settings and inputs were the same and no timing enters any decision, so the drift is floating-point differences between runs (inferred). A difference between two options on one shot smaller than this is not a result.
-
-<details>
-<summary>Across versions 9, 11 and 12</summary>
-
-| Quantity | version 9 | version 11 | version 12 |
-|---|---|---|---|
-| line density | 22.4% | 22.5% | 13.0% |
-| core T_e | 14.7% | 14.5% | 12.9% |
-| whmd | 6.3% | 6.3% | 6.4% |
-| q95 | 8.3% | 8.1% | 7.8% |
-| elongation | 0.078 | 0.074 | 0.086 |
-| axis radius | 2.26 cm | 2.04 cm | 2.32 cm |
-| radiated power | 96% low | 88% low | 76% low |
-| neutrons | 34.6% | 34.6% | 33.8% |
-| runs not reaching their end or disrupting early | 1 | 2 | 1 |
-
-</details>
-
-### What sets each error
-
-- **Density.** MAST had no density feedback: its valves ran pre-programmed waveforms, and its main inboard valve could not be shut during a shot, so its density follows the wall. The simulation holds the density on MAST's programmed line density where there is one, else on the start's Greenwald fraction; that programme itself sits a median 14% from MAST's density per shot (-62% on 22235, +30% on 20689), so holding it exactly cannot do better. Every published fuelling model keeps one number for how much gas a machine's wall keeps, which the rule below keeps out of the general code.
-- **Fast ions.** On MAST's measured profiles the beam model holds 2.04 times the fast-ion energy EFIT allows (EFIT's energy minus the kinetic), 1.69 times with the atomic physics rebuilt from published sources; neutrons from the fast ions present come to 1.15 and 0.91 of measured. This shows as the pressure-energy surplus (+19%), the outward axis (+1.4 cm), 18464's beta-limit collapse and the neutron scatter. What removes the rest is not settled: redistribution by MAST's modes (TRANSP needed about twice the anomalous fast-ion diffusion with MAST's long-lived mode; no published law sets the size) and charge exchange on edge neutrals (needs the wall).
-- **H-mode.** The threshold is Martin 2008 with a low-aspect-ratio term from MAST, NSTX and Pegasus together; on MAST it gives 5 to 6 times Martin where MAST's own measurements give 8 to 10 times (Howlett 2023), so the simulation enters H-mode too readily. The shots it gets wrong sit inside the published fit's scatter (a factor 1.36 either way) 40 to 100% of the time: no published threshold decides them.
-- **Radiated power.** MAST's prad_pol is a weighted sum over one midplane fan of 16 chords that sees the confined edge, the X-point regions and the inner divertor legs. The simulated reading sums the core (1 to 33 kW), carbon in the scrape-off layer and divertor (TORAX's extended Lengyel model with Eich's heat-flux width, 1 to 47 kW on most shots), the inner legs' recycled hydrogen (2 to 5 kW) and the main chamber's hydrogen when neutrals are run (11 to 81 kW). MAST's bolometers read 90 to 340 kW. The Lengyel term is steep: across its published inputs it spans a factor 30.
-- **Shape.** The elongation sits 0.02 below EFIT's at the start and drifts to 0.10 below after 150 ms; the drift grows with how elongated MAST makes the plasma and does not follow the pressure excess. A lead, inferred and untested: FreeGSNKE's MAST coil description against EFIT's. The free boundary is forced up-down symmetric, so the vertical position is good only because these shots sat near the midplane.
-- **Core temperature.** Unbiased in the median but scattered (-11 to +32% across shots); T_i profiles 33 to 41% after 50 ms. Core transport is TORAX's Bohm-gyroBohm held to published confinement laws; no transport network is valid at MAST's aspect ratio (TGLF-NN's spherical models were tested and did not help).
-- **Sawteeth.** Porcelli's trigger with its thermal terms only. Crashes 85 against 107 measured: frequent real sawteeth on beam-heated shots are undercounted.
-- **n = 1 modes.** Most of MAST's n = 1 activity is internal kinks near q_min = 1, which the simulation reads from its own q profile (q_min at or under 1.12 with beams on, Chapman et al. 2010). Its q_min tracks EFIT's moderately (correlation of mode share 0.45 across shots). What the mode does (rotation braking, fast-ion losses) is not modelled.
-- **Starts.** FreeGSNKE's static solve at the start found the wrong plasma on 12 of 25 shots; it is now checked against EFIT and retried.
-
-<details>
-<summary>The error budget with the density held on the measured value</summary>
-
-Measured on version 11, before version 12 changed the density loop. With the line density held on Thomson's measured mean (an oracle run, not a mode for use): line density 4.3%, thermal energy 22 to 16%, radiated power 88 to 77% low; neutrons (34 to 33%) and core T_e (14.5 to 15.6%) barely move, and H-mode gets worse (time 0.42 against 0.09, false on 9 shots) because density lowers the threshold. So density alone would add one quantity; neutrons, temperature, H-mode and radiation need their own fixes.
-
-</details>
-
-<details>
-<summary>Options built, tested and not adopted</summary>
-
-| Option | Measured | Why not |
-|---|---|---|
-| Beams rebuilt from published atomic physics (`beam_options`: Suzuki stopping, halo charge exchange, the plasma's Coulomb logarithm, orbit averaging) | fast-ion energy on measured profiles 2.04 to 1.69 times EFIT's; neutrons 33.8 to 30.3% | absorbs more power, moves the axis out (2.3 to 3.1 cm), more self-disruptions, sawtooth chatter |
-| Each shot's measured beam energy split (`species: "measured"`) | old shots' neutrons nearer (16148: 1.86 to 1.37 of measured) | adopted only inside the rebuilt beams, which were not |
-| Fuelling by neutrals from MAST's measured wall pressure (`fuelling: kn1d_gauge`, KN1D) | L-mode shots: line density -8 to -23%; H-mode shots: +77 to +330% | an oracle; in H-mode the edge source piles up to ten times MAST's edge density |
-| The scrape-off layer's own particle balance (`sol: balance`) | separatrix 0.7 of the line average at a D_perp of 1 m^2/s; the core's density doubled in 25 ms | MAST's measured D_perp (1 to 5 m^2/s) untested |
-| ELMs taking particles out with the density pin off | no change on the H-mode overfuelling | the edge shelf, not the ELMs |
-
-</details>
-
-<details>
-<summary>Earlier checks against real data</summary>
-
-| What | Real data | Result |
-|---|---|---|
-| Profiles, replay with the edge given | JET, 20 discharges | T_e 12 to 19%, T_i 14 to 22%, n_e 12 to 18%, stored energy 9 to 17% at 0.5 to 2 s; C-Mod worse, T_e up to 32% |
-| Profiles, hands-off | JET, C-Mod | JET T 20 to 38%; C-Mod fails on 2 of 5 |
-| Response to a change in heating | JET, 20 starts; MAST, 17 beam steps | JET T_e 15 to 19% with the edge given (holding 43 to 55%); MAST step up T_e 13% at 50 ms (holding 27%) |
-| Island growth and width | MAST, 418 n = 1 and 104 3/2 modes | median width 0.73 to 1.10 of real; little skill on which grows (AUC 0.57 to 0.65) |
-| Island model, version 5 | MAST n = 1; ITER against published numbers | width distribution error 0.23 to 0.32; ITER seed to lock 1.5 to 1.8 s (published 1.4 to 2.4), saturated width 34 to 35 cm (published 32) |
-| Time from onset to lock, given the real width | MAST, 418 modes | 18 against 39 ms: 2.2 times too fast |
-| Sensors from the simulated plasma | MAST pickup coils | coil places right to about 5 cm, readings within 4 to 14% on real maps |
-| Which way MAST's plasma goes after the thermal quench | 40 real disruptions | 12 of 13 where the collapse clearly moves the equilibrium |
-| DREAM after the onset | Vallhagen et al. 2020, three published cases | reproduced; ITER runaways 3.1 to 7.3 MA whatever the timing |
-| The most extreme real shots | MAST, 92 shots | the worse profile channel 1.4 to 1.6 times its typical error; nothing runs away |
-
-</details>
-
-### Not modelled
-
-3D fields (no island shape, no mode coupling, no stochastic field); rotation evolved by TORAX (one number per mode); the wall and its fuel inventory; the main chamber's neutrals without the oracle; a 2D scrape-off layer (edge models return separatrix and target values along one field line); fast-ion redistribution by modes; the disruption past the start of its thermal quench outside the `quench` command; real vertical motion in the running loop (MAST runs are forced symmetric); resistive wall modes and vertical displacements beyond 0D margins; MAST's sudden density losses; a pellet's path; ECCD response against shots (no machine here has ECCD data; the island's drive was checked against one published criterion only).
+All 25 runs reach the end of their window; one (18464) disrupts on its own 41 ms early, from too many fast ions at low density. The simulation beats holding the first frame on T_e, T_i and n_e profiles from about 20 ms on. Two runs of the same shot, version and seed can drift apart through floating-point differences (inferred), so a difference between two options on one shot smaller than that drift is not a result ([VALIDATION.md](VALIDATION.md#repeat-runs)).
 
 ### Beyond the checked range
 
 ITER, SPARC and MAST-U run from machine files with no shots to check them: shapes within 0.03 to 0.07 of published and no solve refused. Fusion power is under design on the general settings from machine files alone (SPARC 67 MW against its 140 MW design; ITER's 15 MA baseline 173 MW against 500 MW), while ITER's 10.5 MA hybrid scenario reached 343 MW and Q 6.5 under versions 4 and 5 of the settings, and the quick start's scenario makes 423 MW at Q 8.3 at 40 s. Report any number from these machines as beyond the checked range.
 
-### Rules the physics keeps
+### Not modelled
 
-No law fitted to MAST enters the general code: coefficients come from published multi-machine work or from physics, a machine file holds hardware and programmes only, and MAST's measurements may check a model, never set it. Three fixes are ruled out by that rule and left open: a wall number per machine, MAST's measured L-H threshold in its machine file, and the size of fast-ion redistribution by MAST's modes. Versions are frozen: a change becomes a new version only after it has been scored on all 25 shots, compared with the recommended version on the same starts, and found better.
-
-## MAST shots
-
-A whole MAST shot needs files in the workspace's `runs/twin/`: the shot file and coil traces (`mast_natural2/shots/`, `coils/`), the start's extras (`mast_natural/extras/`), the instability laws (`mast_natural2/laws.json`), FreeGSNKE's MAST machine (`freeboundary/mast_machine2/`) and, for scoring, EFIT's signals (`whole82/real/`). They are made from FAIR-MAST's TokaMark v1 data (Jackson et al. 2024), which is public, by the tools in `core/`: `mast.py` and `mast_convert_natural.py` (profiles, equilibrium and programme), `mast_machine.py` (FreeGSNKE's machine), `mast_scalars.py`, `whole_shot_efit.py`, `mast_vde.py`, and `fairmast.py`, `gas_extract.py` and `beam_species.py` for extra signals. They read a local zarr copy of the data (`XTORAX_MAST_STORE`, default `~/data/mast/tokamark_v1`) in an environment with zarr. Two inputs came from a separate project's processing, and nothing here writes them yet: the shot catalogue (`mast_catalog/catalog.json`) and the choice of development shots. So the tools are included as they ran, the shot files are not distributed, and the MAST results cannot yet be rebuilt from this repository alone. The 25 scored shots are 15018, 15977, 16148, 16228, 16276, 16458, 17859, 18464, 18886, 20304, 20428, 20689, 20863, 21428, 21947, 22056, 22092, 22235, 22248, 22786, 24042, 24064, 24515, 24608 and 24627.
-
-With the files in place:
-
-| Command | What it does | Time |
-|---|---|---|
-| `python xtorax.py shots [--all]` | the shots that can be run, and those that can also be scored | seconds |
-| `python xtorax.py run SHOT ... \| --scorable [--version V] [--tag T] [--seeds N] [--lanes N] [--extra JSON]` | whole shots hands-off from their first frame, writing `runs/twin/mast_natural2/<tag>/`; `--lanes` runs up to 3 processes; `--extra` adds override keys to the version's | 1 to 4 min a shot |
-| `python xtorax.py score TAG` | scores runs against MAST every 5 ms, beside holding the first frame | 1 to 2 min |
-| `python xtorax.py compare A B` | two scored sets on the same starts and times | 1 min |
-| `python xtorax.py ready NAME` | a scored set against the readiness criteria | 1 min |
-| `python xtorax.py versions` | every frozen version and the recommended one | seconds |
-
-A run writes `results.jsonl` (one line per run: start, end, events, the free boundary's log), `<shot>_<seed>.npz` (scalars every step) and `<shot>_<seed>_prof.npz` (profiles). A MAST run with FreeGSNKE takes 2 to 3 GB of memory, so run at most three at once.
-
-If the workspace keeps a list of development shots, `runs/twin/dev_shots.json` (`{"development": [shot, ...]}`), runs and scores refuse every other shot. I kept one so that shots held out for testing other work were never run by mistake; without the file every shot with files may run.
-
-## Optional pieces
-
-| Piece | For | Setup | Variables |
-|---|---|---|---|
-| FreeGSNKE 3.1.1, in its own environment (it needs numpy under 2.5) | the free boundary: `studio_iter_coupled`, the `twin_*` scenarios, hands-off MAST runs, `quench` on MAST | a new environment with `pip install freegsnke==3.1.1 "numpy<2.5"`, and FreeGSNKE's source at commit `06be120` in `external/freegsnke`, which the server imports (the 3.1.1 release cannot load ITER's machine); `env/freegsnke-venv.txt` is the author's frozen Windows environment, for reference | `XTORAX_FREEGSNKE_PYTHON`, `XTORAX_FREEGSNKE_SRC` |
-| KN1DPy | fuelling by neutrals (an oracle) | from its source; its installer misses `jh_bscoef.npz`, which goes into `site-packages/KN1DPy/rates/johnson_hinnov/` by hand | `XTORAX_KN1D_PYTHON` |
-| DREAM | `quench` off MAST | built from source; on Windows, in WSL | `XTORAX_DREAM_PYTHON` (default `python3`), `XTORAX_DREAMPATH` (default `$HOME/DREAM`) |
-| zarr | FAIR-MAST downloads and the MAST tools | a new environment with zarr 3 (`env/fairmast-venv.txt` lists the author's) | `XTORAX_FAIRMAST_PYTHON`, `XTORAX_MAST_STORE` |
-| The 2D island solver and its surrogate | an island from a 2D solver (`core/island2d.py`) | not part of this release; they belong to a separate, unpublished project | `solver/` and `models/` in the workspace |
-| The etched chip | the decision model `etched` | not part of this release; it belongs to a separate, unpublished project | `XTORAX_CHIP_SERVER` |
-
-A variable names that piece's Python (or folder); without it the tools look in the workspace's `external/`: `external/freegsnke-venv`, `external/kn1d-venv` and `external/fairmast-venv` for the environments, `external/freegsnke` for FreeGSNKE's source. `XTORAX_PYTHON` overrides the Python that `xtorax.py` uses for its own runs, which is otherwise the one running it. `python xtorax.py env` reports what it finds.
+3D fields (no island shape, no mode coupling, no stochastic field); rotation evolved by TORAX (one number per mode); the wall and its fuel inventory; the main chamber's neutrals without the oracle; a 2D scrape-off layer (edge models return separatrix and target values along one field line); fast-ion redistribution by modes; the disruption past the start of its thermal quench outside the `quench` command; real vertical motion in the running loop (MAST runs are forced symmetric); resistive wall modes and vertical displacements beyond 0D margins; MAST's sudden density losses; a pellet's path; ECCD response against shots (no machine here has ECCD data; the island's drive was checked against one published criterion only).
 
 ## Where things live
 
 | Path | What it holds |
 |---|---|
 | `xtorax.py` | the entry point: env, versions, shots, run, score, compare, ready, script, serve, call, studio, smoke |
-| `core/` | the simulator and harness, 54 modules (map below) |
+| `core/` | the simulator and harness, 55 modules (groups below) |
 | `scenarios/` | 14 scenarios: ITER, SPARC, MAST-U, MAST shots, test plasmas |
 | `studio/` | the front end's page, script and style |
-| `examples/` | the quick start's script and session, a decision model of your own and its session, an ITER agent session, a MAST session |
+| `examples/` | the quick start's script and session, a decision model of your own and its session, an ITER agent session, a MAST session and script |
 | `data/` | EPED-NN's weights and their check outputs (`epednn/`), and the reactor check's reference trace |
-| `env/` | the package lists of the four environments, as frozen on 9 November 2026 |
+| `env/` | the package lists of the four tested environments, as frozen on 9 November 2026 |
 | `AGENTS.md` | the operating manual for an AI agent driving the harness |
+| `VALIDATION.md` | the measured record behind [How far to trust it](#how-far-to-trust-it) |
+| `CHANGELOG.md` | the release notes |
 
-Results, MAST data and outside tools live in a workspace: `XTORAX_HOME` if set, else the repository itself. Results and data go in its `runs/twin/`, outside tools in its `external/`; git ignores both.
-
-Module headers and comments cite tests by code (H34 to H91) and files under `docs/`: they belong to my research log, which is not published, and the numbers those tests produced are the ones in this README.
+Results, MAST data and outside tools live in the workspace ([Set environment variables](#set-environment-variables)): results and data in its `runs/twin/`, outside tools in its `external/`.
 
 | Group | Modules in `core/` |
 |---|---|
 | entry points | `harness.py`, `studio.py`, `natural.py` |
 | the reactor and harness | `ntm.py` (TORAX plus islands, ELMs, the step), `twin.py` (scenarios, commands, branches), `actuators.py`, `impurities.py`, `sensors.py`, `run_ntm.py` |
-| the coupled plasma | `coupled.py`, `machines.py`, `lh_general.py`, `porcelli.py`, `beams.py`, `beam_atomic.py`, `epednn.py`, `pedestal.py`, `freeboundary.py`, `freegsnke_server.py`, `mast_machine.py`, `vessel.py`, `radiation.py`, `edge_radiation.py`, `sol.py`, `neutrals.py`, `kn1d_server.py`, `tglfnn_st.py` |
+| the coupled plasma | `coupled.py`, `machines.py`, `lh_general.py`, `porcelli.py`, `beams.py`, `beam_atomic.py`, `epednn.py`, `pedestal.py`, `freeboundary.py`, `freegsnke_server.py`, `mast_machine.py`, `vessel.py`, `radiation.py`, `edge_radiation.py`, `sol.py`, `neutrals.py`, `kn1d_server.py`, `tglfnn_st.py`, `tglfnn_bson.py` |
 | real shots | `mast.py`, `shot.py`, `mast_anchor.py`, `whole_shot.py`, `whole_shot_efit.py`, `readiness.py`, `density_drops.py`, `mast_convert_natural.py`, `mast_scalars.py`, `fairmast.py`, `gas_extract.py`, `beam_species.py` |
 | after the onset | `mast_vde.py`, `dream_iter.py` |
-| decision models | `controllers.py`, `forecaster.py`, `chip_forecaster.py` (the forecaster's quantized form; training it needs a separate project's hardware flow), `island2d.py`, `loop2d.py`, `adversary.py` |
+| decision models | `controllers.py`, `forecaster.py`, `chip_forecaster.py` (the forecaster's quantized form), `island2d.py`, `loop2d.py`, `adversary.py` |
 | checks | `check_reactor.py`, `check_plant.py`, `check_pellet.py`, `check_edge.py`, `check_coupled.py`, `check_branches.py`, `check_quench.py` |
 
-## Checks
+Each module's header gives its physics, sources and checks. Headers and comments cite tests by code (H34 to H91) and files under `docs/`, which belong to the project's development log; the log is not published, and the numbers those tests produced are the ones in this README and VALIDATION.md. "The chip project" in comments is the separate, unpublished project this simulator was built to test.
 
-| Check | What it shows |
-|---|---|
-| `python xtorax.py smoke` | the functional checks one after another, pass or fail, in `runs/twin/smoke/summary.txt`. On a clean workspace the reactor, plant, pellet and edge checks run, in about 4 minutes, and the three that need FreeGSNKE or MAST shot files are reported as skipped; the CI runs it on every push |
-| `python core/check_reactor.py` | the steppable reactor against saved traces of the same setup, a branch repeated bit for bit, and each edit doing what it says |
-| `python core/check_plant.py` | every actuator does what it says, on branches of one ITER plasma |
-| `python core/check_coupled.py [--mast]` | EPED-NN, FreeGSNKE, the growth rate, a heating step and branches through the harness's commands |
-| `python core/check_branches.py [--case mast iter]` | branches come back exactly: a snapshot, a run, a branch with a pellet, gas, an island and heating fired, back to the snapshot, the same run again; every record must match the first run's |
-| `python core/check_quench.py` | `quench` on a MAST shot and on ITER |
-| `python core/epednn.py check` | EPED-NN's outputs against EPEDNN.jl's on the same inputs |
-| `python xtorax.py ready NAME` | a scored set of MAST runs against the readiness criteria |
+## Terms
 
-## Releases
-
-| Release | What changed | Whole-shot results |
-|---|---|---|
-| 1.0, 9 November 2026 | version 12 frozen and packaged | the reference set |
-| 1.1, 9 November 2026 | exact branches; pellets sized by the machine's injector | unchanged: shot 20689 identical on all 46 scores |
-| 1.2, 19 November 2026 | the public repository: a workspace and outside tools set by variables, EPED-NN's weights and the reactor check's reference shipped, servers that answer this machine only, decision models from a file, the front end restyled after TORAX's own Plotly figures | unchanged: the plasma settings are version 12's |
-
-**Branches in 1.1.** In 1.0 a snapshot kept TORAX's state, the reactor's islands and ELM clock, the plant and the harness's own lists, but not the models a step calls, so a restored branch carried on with the last branch's coupled plasma: on 20689 a null branch run after a branch that fired a pellet, gas, an island and heating was in H-mode from its first step, because the fired branch was. An AI agent driving the harness found the transport table leaking the same way. A snapshot now also holds every model on the step (the coupled plasma's random draws, H-mode, collapse and density-loop state, the transport table, EPED-NN's schedule, the free boundary's client), the reactor's carried readings, the free boundary's geometry, the ELM draws, and FreeGSNKE's own state. Measured: on MAST 20689 with FreeGSNKE and on ITER with FreeGSNKE and EPED-NN, the null branch and a second restore repeat the first run exactly on every record (74 and 42 quantities, 40 steps each); a snapshot takes 0.01 s and a restore 0.01 to 0.04 s.
-
-**Pellets in 1.1.** The `pellet` command took a sphere's radius with a 3 mm default: 6.8e21 atoms, ITER's scale and about 50 times the electrons of a MAST plasma such as 20689's. Sizes now come from each machine's injector in `machines.py`: MAST's made cylinders 1.1, 1.35 and 1.7 mm long and wide, holding 0.6, 1.2 and 2.4e20 atoms, fired at 240 to 450 m/s from the top into the high-field side ([Valovič et al. 2008](https://iopscience.iop.org/article/10.1088/1742-6596/123/1/012039/pdf)); ITER's makes 5 mm fuelling and 3 mm ELM-pacing pellets. With no size given a pellet is the machine's default, `d_mm` takes an injector's size and `r_mm` a sphere's radius, and the answer gives the pellet's atoms and their share of the plasma's electrons, with a warning above one. On 20689 the 1.1 mm pellet raises the line density 47% at once and 21% after 10 ms, an e-folding of about 12 ms, inside MAST's measured retention of 2 to 20 ms in L-mode.
-
-## Words used here
-
-| Word | Meaning |
+| Term | Meaning |
 |---|---|
 | TORAX | Google DeepMind's open tokamak transport code, written in JAX: it evolves temperature, density and current profiles in time |
 | MAST, MAST-U, ITER, SPARC | MAST: a UK spherical tokamak that ran until 2013, whose data FAIR-MAST publishes; MAST-U: its successor; ITER: the international tokamak being built in France; SPARC: Commonwealth Fusion Systems' compact high-field tokamak |
@@ -426,6 +432,28 @@ Module headers and comments cite tests by code (H34 to H91) and files under `doc
 | branch | a snapshot and a restore: the same state run two ways |
 | seed | an island seed is a small island that an ELM, a sawtooth crash or a collapse starts; a random seed fixes a run's random draws |
 
-## Credits and license
+## Releases
 
-Apache License 2.0 ([LICENSE](LICENSE)); third-party work and its licenses are listed in [NOTICE](NOTICE). Built on [TORAX](https://github.com/google-deepmind/torax) (Apache 2.0), with EPED-NN's weights from [EPEDNN.jl](https://github.com/ProjectTorreyPines/EPEDNN.jl) (Apache 2.0); [FreeGSNKE](https://github.com/FusionComputingLab/freegsnke), KN1DPy and DREAM are optional and not shipped. MAST data come from FAIR-MAST (Jackson et al., SoftwareX 27, 101869, 2024). Expanded TORAX is an independent project, not affiliated with or endorsed by Google DeepMind or the UK Atomic Energy Authority.
+The release notes are in [CHANGELOG.md](CHANGELOG.md). Release 1.2 (19 November 2026) runs version 12 of the plasma settings, the version every whole-shot result here was measured on.
+
+## Citing Expanded TORAX
+
+Expanded TORAX is built on TORAX. A TORAX paper is [available on arXiv](https://arxiv.org/abs/2406.06718); cite it for TORAX:
+
+```
+@article{torax2024arxiv,
+  title={{TORAX: A Fast and Differentiable Tokamak Transport Simulator in JAX}},
+  author={Citrin, Jonathan and Goodfellow, Ian and Raju, Akhil and Chen, Jeremy
+  and Degrave, Jonas and Donner, Craig and Felici, Federico and Hamel, Philippe
+  and Huber, Andrea and Nikulin, Dmitry and Pfau, David and Tracey, Brendan, and
+  Riedmiller, Martin and Kohli, Pushmeet},
+  journal={arXiv preprint arXiv:2406.06718},
+  year={2024}
+}
+```
+
+To refer to Expanded TORAX itself, cite this repository's URL and the release used. A result that rests on an optional piece should also cite that piece as its own repository asks: [FreeGSNKE](https://github.com/FusionComputingLab/freegsnke), [EPEDNN.jl](https://github.com/ProjectTorreyPines/EPEDNN.jl) for EPED-NN, [DREAM](https://github.com/chalmersplasmatheory/DREAM), KN1DPy, or [TurbulentTransport.jl](https://github.com/ProjectTorreyPines/TurbulentTransport.jl). MAST data come from FAIR-MAST (Jackson et al., SoftwareX 27, 101869, 2024).
+
+## License
+
+Apache License 2.0 ([LICENSE](LICENSE)). Third-party work and its licenses are listed in [NOTICE](NOTICE): TORAX (Apache 2.0) is installed as a dependency, EPED-NN's weights come from EPEDNN.jl (Apache 2.0), and FreeGSNKE, KN1DPy, DREAM and TurbulentTransport.jl are optional and not shipped.

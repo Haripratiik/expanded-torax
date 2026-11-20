@@ -183,4 +183,4 @@ Actuators and instabilities, each tagged with its level (torax: TORAX's own mode
 
 ## Where to look
 
-[README.md](README.md): what it is, every measured error and limitation, the scenarios, the optional pieces and where things live. `core/twin.py`'s header: every scenario key and decision model. Each module's own header: its physics, sources and checks. Headers cite tests by code (H34 to H91) and files under `docs/`: they belong to the author's research log, which is not published.
+[README.md](README.md): what it is, how to install and run it, the scenarios, the harness, the optional pieces, the main measured errors and where things live. [VALIDATION.md](VALIDATION.md): the full measured record and every known limitation. `core/twin.py`'s header: every scenario key and decision model. Each module's own header: its physics, sources and checks. Headers cite tests by code (H34 to H91) and files under `docs/`: they belong to the project's development log, which is not published.

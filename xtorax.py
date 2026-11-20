@@ -1,6 +1,6 @@
 """xtorax: one entry point for the expanded TORAX twin and its harness. README.md and AGENTS.md beside this file say what each part is and how far to trust it.
 
-Run with a Python that has TORAX 1.4.3 (README.md, "Install"), from this folder:
+Run with a Python that has TORAX 1.4.3 (README.md, "Installation guide"), from this folder:
   python xtorax.py <command> [options]
 
 Commands
@@ -17,7 +17,8 @@ Commands
   serve SCENARIO [--port 8801]        the harness as a local server: POST commands as JSON, GET /observe, GET /help
   call JSON [--port 8801]             one command to a running server
   studio [--scenario NAME] [--port 8801]   the front end, in a browser at http://127.0.0.1:PORT
-  smoke                               the smoke test of the whole harness, seven checks one after another (10 to 12 minutes)
+  smoke                               the harness's functional checks one after another; those needing FreeGSNKE or MAST shot files
+                                      are skipped when they are missing (about 4 minutes on a clean workspace, 10 to 12 with everything)
 
 SCENARIO is a file in scenarios/ (name with or without .json) or a path.
 """
@@ -31,7 +32,7 @@ import sys
 import time
 
 sys.dont_write_bytecode = True                           # no __pycache__ in core/ from this file's own imports
-PACKAGE = "1.2"                                          # the package's release; the plasma's settings are natural.RECOMMENDED's version (README.md, "Releases")
+PACKAGE = "1.2"                                          # the package's release; the plasma's settings are natural.RECOMMENDED's version (CHANGELOG.md)
 HERE = os.path.dirname(os.path.abspath(__file__))          # the repository: core/, scenarios/, studio/, data/
 CORE = os.path.join(HERE, "core")                          # the simulator and harness
 ROOT = os.path.abspath(os.environ.get("XTORAX_HOME") or HERE)   # the workspace: data and results in runs/twin, outside tools in external/
@@ -64,7 +65,7 @@ def core(*parts):
 
 
 def run_py(args, timeout=None, isolated=False):
-    """A script of core/ in TORAX's environment, from the project root, its output passed through."""
+    """A script of core/ in TORAX's environment, from the repository, its output passed through."""
     cmd = [PY, "-u"] + (["-I"] if isolated else []) + args
     return subprocess.call(cmd, cwd=ROOT, env=ENV, timeout=timeout)
 
@@ -112,7 +113,7 @@ def cmd_env(a):
              ("runs/twin/beam_species.json", "each shot's beam energy split (beam_options species measured)"),
              ("runs/twin/sensors/geometry.json", "the synthetic magnetic sensors (quench mode full)"),
              ("runs/twin/dev_shots.json", "optional: a development-shot list; when present, runs and scores refuse any other shot"),
-             ("solver/ntm.py", "the 2D island solver (scenarios studio_iter_2d_*); not part of this release"))
+             ("solver/ntm.py", "the 2D island solver (scenario key plant2d); not part of this release"))
     for f, enables in files:
         check(f, os.path.exists(os.path.join(ROOT, f)), enables)
     nat = natural()
@@ -310,7 +311,7 @@ def main():
     p.set_defaults(f=cmd_shots)
     p = sub.add_parser("run")
     p.add_argument("shots", type=int, nargs="*")
-    p.add_argument("--scorable", action="store_true", help="every scorable shot in the workspace (25 in the author's)")
+    p.add_argument("--scorable", action="store_true", help="every scorable shot in the workspace (25 in the development workspace)")
     p.add_argument("--version", default=None)
     p.add_argument("--tag", default=None)
     p.add_argument("--seeds", type=int, default=1)
