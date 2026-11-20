@@ -62,9 +62,9 @@ python xtorax.py call '{"cmd": "island", "m": 2, "n": 1, "w_cm": 4}'
 python xtorax.py call '{"cmd": "restore", "name": "flat_top"}'
 ```
 
-Or a whole list at once: `python xtorax.py script studio_iter examples/iter_quickstart.json`. Scenarios are the files in `scenarios/`.
+Or a whole list at once: `python xtorax.py script studio_iter examples/iter_quickstart.json`. Scenarios are the files in `scenarios/`. The quoting above is for Git Bash or a Linux or macOS shell; in Windows PowerShell, put the commands in a file and use `script`.
 
-**From Python.** Put `core/` on `sys.path`; `twin.Harness(scenario_dict)` builds a scenario's plasma, `h.apply({...})` takes the same commands, and `h.apply({"cmd": "observe"})` reads the plasma. `examples/run_iter.py` is a complete example. For a MAST shot, `natural.hands_off(shot)` returns the harness with the recommended version and FreeGSNKE on it as `h.free`; close FreeGSNKE with `h.free.close()` when done (`examples/run_shot.py`).
+**From Python.** Put `core/` on `sys.path`; `twin.Harness(json.load(open("scenarios/studio_iter.json")))` builds a scenario's plasma, `h.apply({...})` takes the same commands, and `h.apply({"cmd": "observe"})` reads the plasma. `examples/run_iter.py` is a complete example. For a MAST shot, `natural.hands_off(shot)` returns the harness with the recommended version and FreeGSNKE on it as `h.free`; close FreeGSNKE with `h.free.close()` when done (`examples/run_shot.py`).
 
 **Run a MAST shot and score it** (needs MAST shot files in the workspace; README, "MAST shots"):
 
@@ -102,7 +102,7 @@ Record what was predicted, what was measured and whether it was adopted. A chang
 
 ## The server's protocol
 
-POST a JSON object with `cmd` and its parameters to `http://127.0.0.1:8801/`; the answer is JSON. `GET /observe` returns the plasma now, `GET /help` the command table with parameters. One command runs at a time; the server takes named commands only, never code. An unknown command answers `{"error": ..., "commands": [...]}`. Times are in seconds of plasma time (`until` is absolute; `n` counts TORAX steps). `observe` returns scalars (time, fusion power and Q or the MAST scalars, stored energy, line density, temperatures, q, H-mode, ELMs, islands with their width, rotation and lock, the drive), and with `"profiles": true` T_e, T_i, n_e and q against rho.
+POST a JSON object with `cmd` and its parameters to `http://127.0.0.1:8801/`; the answer is JSON. `GET /observe` returns the plasma now, `GET /help` the command table with parameters. One command runs at a time. The server answers this machine only: a request whose Host is not 127.0.0.1 or localhost on its port, or a browser request from another site, gets 403. `decision` with `"kind": "python"` imports and calls a function by name, so the server refuses it unless started with `--allow-python`; scripts and Python sessions may use it. An unknown command answers `{"error": ..., "commands": [...]}`. Times are in seconds of plasma time (`until` is absolute; `n` counts TORAX steps). `observe` returns scalars (time, fusion power and Q or the MAST scalars, stored energy, line density, temperatures, q, H-mode, ELMs, islands with their width, rotation and lock, the drive), and with `"profiles": true` T_e, T_i, n_e and q against rho.
 
 Commands and their parameters:
 
@@ -129,7 +129,7 @@ Commands and their parameters:
 | `trip` | `units`, `duration` (gyrotrons lost) |
 | `mirror_stuck` | `duration` |
 | `sensor_bias` | `surface_cm`, `width_cm`, `duration` |
-| `decision` | `spec`, as in a scenario (`kind`: none, rule, phys (control on the island equation), net (a forecaster), python (your own function), etched (a separate project's chip, not included)); `core/twin.py`'s header lists each kind's settings |
+| `decision` | `spec`, as in a scenario (`kind`: none, rule, phys (control on the island equation), net (a forecaster, with trained weights you supply), python (your own function: `"target": "module:function"` or `"path/to/file.py:function"`; refused over HTTP without `--allow-python`), etched (a separate, unpublished project's chip, not included)); `core/twin.py`'s header lists each kind's settings |
 | `drive` | `P` (MW), `aim` (rho) |
 | `set`, `get` | `path` of a TORAX runtime parameter (for example `sources.gas_puff.S_total`), `value` |
 | `snapshot`, `restore` | `name`. A snapshot holds everything a step reads: TORAX's state, the reactor's carried readings, ELM draws and module arrays, the plant, every model on the step (the coupled plasma's random draws, H-mode, density loop and transport table, EPED-NN's schedule, the free boundary's client) and FreeGSNKE's own state. A null branch repeats the first run exactly (`core/check_branches.py`); the same name can be restored any number of times |
@@ -176,11 +176,11 @@ Actuators and instabilities, each tagged with its level (torax: TORAX's own mode
 - FreeGSNKE and KN1D run as separate processes in their own environments, talking over pipes. A refused or failed solve keeps the last accepted shape; the start's solve is checked against EFIT's plasma and retried, or the run keeps EFIT's surfaces (`free.start` says which).
 - Fuelling by neutrals (`fuelling: kn1d_gauge`) calls KN1D every 10 ms of plasma time at 10 to 20 s each; it reads MAST's measured wall pressure, so it is an oracle, not a prediction.
 - ELMs, sawteeth, island seeds and some laws are drawn per run from seeds, and even the same seed is not always repeated exactly: one shot run twice gave q95 errors of 3.0% and 3.3% (floating-point drift, README.md). Compare statistics over shots or seeds, never one run against another.
-- Branches are exact from release 1.1: a restore brings back every model on the step and FreeGSNKE's own state, so a null branch repeats the first run on every record (`core/check_branches.py`). A free boundary built inside a branch is closed on restore; if FreeGSNKE's server stopped after a snapshot, that snapshot cannot be restored.
+- Branches are exact from release 1.1: within one process, a restore brings back every model on the step and FreeGSNKE's own state, so a null branch repeats the first run on every record (`core/check_branches.py`). A free boundary built inside a branch is closed on restore; if FreeGSNKE's server stopped after a snapshot, that snapshot cannot be restored.
 - Pellets: MAST's injector made 0.6 to 2.4e20 atoms per pellet (1.1 to 1.7 mm), 0.44 to 1.64 of the electrons of a low-density plasma such as 20689's; smaller pellets are a what-if beyond MAST's hardware, so label them. The line density jumps at once and decays over about 12 ms, then sits 1 to 3.5% below the null branch for a few tens of ms while version 12's density loop rebuilds its source: read a pellet's response against its null branch, and the first 10 to 20 ms most. A pellet past the Greenwald density ends the shot only with `limits` on.
 - A run that ends early either stopped on TORAX's numerical checks (`sim_error`) or disrupted on its own (`disrupted`); `xtorax.py ready` separates the two.
 - A sleeping computer stalls runs; the quench steps have time limits so a run recovers after waking.
 
 ## Where to look
 
-[README.md](README.md): what it is, every measured error and limitation, the scenarios, the optional pieces and where things live. `core/twin.py`'s header: every scenario key and decision model. Each module's own header: its physics, sources and checks.
+[README.md](README.md): what it is, every measured error and limitation, the scenarios, the optional pieces and where things live. `core/twin.py`'s header: every scenario key and decision model. Each module's own header: its physics, sources and checks. Headers cite tests by code (H34 to H91) and files under `docs/`: they belong to the author's research log, which is not published.

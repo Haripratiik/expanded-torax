@@ -9,10 +9,10 @@ on:
 jobs:
   quickstart:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
@@ -22,5 +22,9 @@ jobs:
         run: python xtorax.py env
       - name: EPED-NN against EPEDNN.jl
         run: python core/epednn.py check
-      - name: ITER, a branch with an island and one without
+      - name: ITER, settled, a branch with an island and one without
         run: python examples/run_iter.py
+      - name: A decision model of your own
+        run: python xtorax.py script studio_iter examples/my_decision_session.json
+      - name: Smoke checks a clean workspace can run
+        run: python xtorax.py smoke

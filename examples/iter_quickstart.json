@@ -1,5 +1,5 @@
 [
-  {"cmd": "step", "n": 20},
+  {"cmd": "step", "until": 40},
   {"cmd": "observe"},
   {"cmd": "snapshot", "name": "before"},
   {"cmd": "island", "m": 2, "n": 1, "w_cm": 4},

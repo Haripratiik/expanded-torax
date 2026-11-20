@@ -15,7 +15,9 @@ import ntm  # noqa: E402
 import run_ntm  # noqa: E402
 import torax  # noqa: E402
 
-PATH = os.path.join("runs", "twin", "reactor_reference.npz")
+SAVED = os.path.join("runs", "twin", "reactor_reference.npz")      # --save writes the workspace's own reference here
+SHIPPED = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "reactor_reference.npz")
+PATH = SAVED if (os.path.exists(SAVED) or "--save" in sys.argv) else SHIPPED     # else the reference that ships with the repository
 
 
 def setup(t_final=30.0):
@@ -31,6 +33,7 @@ cfg, modes, kw = setup()
 if "--save" in sys.argv:
     _, recs = ntm.run(cfg, modes, **kw)
     w, pf = trace(recs)
+    os.makedirs(os.path.dirname(PATH), exist_ok=True)
     np.savez(PATH, w=w, pf=pf)
     print("saved", PATH, "steps", len(w), "w max", w.max(), "P_fus end", pf[-1] / 1e6)
     sys.exit()

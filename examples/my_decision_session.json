@@ -1,0 +1,7 @@
+[
+  {"cmd": "decision", "spec": {"kind": "python", "target": "examples/my_decision.py:make", "args": {"on_cm": 2}}},
+  {"cmd": "step", "until": 40},
+  {"cmd": "island", "m": 2, "n": 1, "w_cm": 4},
+  {"cmd": "step", "n": 30},
+  {"cmd": "observe"}
+]
