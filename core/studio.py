@@ -169,6 +169,7 @@ class Studio:
         import actuators
         import twin
         self.running, self.state, self.message = False, "loading", f"building {name}"
+        name = "".join(ch for ch in str(name) if ch.isalnum() or ch in "-_")      # a scenario's name, never a path out of scenarios/
         s = json.load(open(os.path.join(SCENARIOS, name + ".json")))
         if self.h is not None and self.h.free is not None:
             self.h.free.close()
@@ -430,7 +431,26 @@ def heat_factor():
     return ntm.HEAT[0]
 
 
-def serve(studio, port):
+def from_here(handler, port, post=False):
+    """A request from this machine: the Host header names the loopback address and port (so a DNS name rebound to 127.0.0.1
+    does not reach the server), and a POST that carries an Origin (every browser's does) comes from the server's own page."""
+    hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
+    if handler.headers.get("Host", "") not in hosts:
+        return False
+    origin = handler.headers.get("Origin")
+    return not (post and origin is not None and origin not in {"http://" + h for h in hosts})
+
+
+def python_decision(cmd):
+    """Whether a command asks for decision {"kind": "python"}, which imports and calls a function by name."""
+    spec = cmd.get("spec") if isinstance(cmd, dict) else None
+    return isinstance(cmd, dict) and cmd.get("cmd") == "decision" and isinstance(spec, dict) and spec.get("kind") == "python"
+
+
+REFUSED_PYTHON = "decision kind python runs a named Python function; the server refuses it unless started with --allow-python"
+
+
+def serve(studio, port, allow_python=False):
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
 
@@ -448,6 +468,8 @@ def serve(studio, port):
                 self.close_connection = True
 
         def do_GET(self):
+            if not from_here(self, port):
+                return self._send(dict(error="this server answers requests from this machine only"), code=403)
             url = urllib.parse.urlparse(self.path)
             query = dict(urllib.parse.parse_qsl(url.query))
             try:
@@ -491,6 +513,8 @@ def serve(studio, port):
                 return self._send(dict(error=repr(err)), code=500)
 
         def do_POST(self):
+            if not from_here(self, port, post=True):
+                return self._send(dict(error="this server answers requests from this machine only"), code=403)
             try:
                 c = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
                 path = urllib.parse.urlparse(self.path).path
@@ -504,6 +528,8 @@ def serve(studio, port):
                 if path == "/api/step":
                     return self._send(studio.call("step", int(c.get("n", 1))))
                 if path == "/api/command":
+                    if python_decision(c) and not allow_python:
+                        return self._send(dict(error=REFUSED_PYTHON), code=403)
                     return self._send(studio.call("command", c))
                 if path == "/api/branch":
                     return self._send(studio.call("branch", c["name"]))
@@ -584,8 +610,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scenario", default="studio_iter")
     ap.add_argument("--port", type=int, default=8801)
+    ap.add_argument("--allow-python", action="store_true", help="accept decision {\"kind\": \"python\"}, which runs a named Python function")
     args = ap.parse_args()
-    serve(Studio(args.scenario), args.port)
+    serve(Studio(args.scenario), args.port, allow_python=args.allow_python)
 
 
 if __name__ == "__main__":

@@ -32,7 +32,26 @@ def clean(x):
     return x
 
 
-def serve(h, port):
+def from_here(handler, port, post=False):
+    """A request from this machine: the Host header names the loopback address and port (so a DNS name rebound to 127.0.0.1
+    does not reach the server), and a POST that carries an Origin (every browser's does) comes from the server's own page."""
+    hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
+    if handler.headers.get("Host", "") not in hosts:
+        return False
+    origin = handler.headers.get("Origin")
+    return not (post and origin is not None and origin not in {"http://" + h for h in hosts})
+
+
+def python_decision(cmd):
+    """Whether a command asks for decision {"kind": "python"}, which imports and calls a function by name."""
+    spec = cmd.get("spec") if isinstance(cmd, dict) else None
+    return isinstance(cmd, dict) and cmd.get("cmd") == "decision" and isinstance(spec, dict) and spec.get("kind") == "python"
+
+
+REFUSED_PYTHON = "decision kind python runs a named Python function; the server refuses it unless started with --allow-python"
+
+
+def serve(h, port, allow_python=False):
     class Handler(BaseHTTPRequestHandler):
         def _send(self, obj, code=200):
             body = json.dumps(clean(obj)).encode()
@@ -43,11 +62,17 @@ def serve(h, port):
             self.wfile.write(body)
 
         def do_GET(self):
+            if not from_here(self, port):
+                return self._send(dict(error="this server answers requests from this machine only"), 403)
             self._send(h.observe() if self.path.startswith("/observe") else h.COMMANDS)
 
         def do_POST(self):
+            if not from_here(self, port, post=True):
+                return self._send(dict(error="this server answers requests from this machine only"), 403)
             try:
                 cmd = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                if python_decision(cmd) and not allow_python:
+                    return self._send(dict(error=REFUSED_PYTHON), 403)
                 self._send(h.apply(cmd))
             except Exception as err:
                 self._send(dict(error=str(err)), 400)
@@ -64,6 +89,7 @@ def main():
     ap.add_argument("target", help="scenario file; for call, the command as JSON")
     ap.add_argument("commands", nargs="?", default=None, help="script: a JSON list of commands")
     ap.add_argument("--port", type=int, default=8801)
+    ap.add_argument("--allow-python", action="store_true", help="serve: accept decision {\"kind\": \"python\"}, which runs a named Python function")
     args = ap.parse_args()
     if args.how == "call":
         req = urllib.request.Request(f"http://127.0.0.1:{args.port}/", data=args.target.encode(), headers={"Content-Type": "application/json"})
@@ -79,7 +105,7 @@ def main():
         h = twin.Harness(scenario, keep_history=False)
     try:
         if args.how == "serve":
-            serve(h, args.port)
+            serve(h, args.port, allow_python=args.allow_python)
         else:
             t0 = time.perf_counter()
             for c in json.load(open(args.commands)):

@@ -31,7 +31,7 @@ import sys
 import time
 
 sys.dont_write_bytecode = True                           # no __pycache__ in core/ from this file's own imports
-PACKAGE = "1.1"                                          # the package's release; the plasma's settings are natural.RECOMMENDED's version (README.md, "Releases")
+PACKAGE = "1.2"                                          # the package's release; the plasma's settings are natural.RECOMMENDED's version (README.md, "Releases")
 HERE = os.path.dirname(os.path.abspath(__file__))          # the repository: core/, scenarios/, studio/, data/
 CORE = os.path.join(HERE, "core")                          # the simulator and harness
 ROOT = os.path.abspath(os.environ.get("XTORAX_HOME") or HERE)   # the workspace: data and results in runs/twin, outside tools in external/
@@ -119,11 +119,11 @@ def cmd_env(a):
     usable = shot_table(nat.development_shots())
     check("MAST shot data", len(usable["runnable"]) > 0, "whole MAST shots (run, score, studio on a shot)", f"{len(usable['runnable'])} shots runnable, {len(usable['scorable'])} also scorable")
     wsl = shutil.which("wsl.exe") or shutil.which("wsl")
-    dream_py = os.environ.get("XTORAX_DREAM_PYTHON", "$HOME/venvs/aurora/bin/python")
-    dream = os.environ.get("XTORAX_DREAMPATH", "$HOME/build/DREAM")
+    dream_py = os.environ.get("XTORAX_DREAM_PYTHON", "python3")
+    dream = os.environ.get("XTORAX_DREAMPATH", "$HOME/DREAM")
     if wsl or not WIN:
         try:
-            probe = f"ls {dream_py} {dream} >/dev/null 2>&1 && echo yes || echo no"
+            probe = f"command -v {dream_py} >/dev/null 2>&1 && ls {dream}/py >/dev/null 2>&1 && echo yes || echo no"
             out = subprocess.run([wsl, "-e", "bash", "-lc", probe] if WIN else ["bash", "-lc", probe],
                                  capture_output=True, text=True, timeout=60, env=dict(os.environ, MSYS_NO_PATHCONV="1"))
             ok = "yes" in out.stdout
@@ -242,7 +242,7 @@ def cmd_script(a):
 
 
 def cmd_serve(a):
-    return run_py([core("harness.py"), "serve", scenario_path(a.scenario), "--port", str(a.port)])
+    return run_py([core("harness.py"), "serve", scenario_path(a.scenario), "--port", str(a.port)] + (["--allow-python"] if a.allow_python else []))
 
 
 def cmd_call(a):
@@ -254,7 +254,7 @@ def cmd_studio(a):
         a.scenario = "studio_mast_handsoff_20689" if 20689 in shot_table(None)["runnable"] else "studio_iter"
     name = os.path.basename(a.scenario)[:-5] if a.scenario.endswith(".json") else a.scenario
     print(f"the front end at http://127.0.0.1:{a.port}  (scenario {name}; ready in about a minute while TORAX's step compiles, then press Run)", flush=True)
-    return run_py([core("studio.py"), "--scenario", name, "--port", str(a.port)])
+    return run_py([core("studio.py"), "--scenario", name, "--port", str(a.port)] + (["--allow-python"] if a.allow_python else []))
 
 
 SMOKE = (("reactor", ["check_reactor.py"], ()), ("plant", ["check_plant.py"], ()), ("pellet", ["check_pellet.py"], ()), ("edge", ["check_edge.py"], ()),
@@ -336,6 +336,7 @@ def main():
     p = sub.add_parser("serve")
     p.add_argument("scenario")
     p.add_argument("--port", type=int, default=8801)
+    p.add_argument("--allow-python", action="store_true", help="accept decision {\"kind\": \"python\"}, which runs a named Python function")
     p.set_defaults(f=cmd_serve)
     p = sub.add_parser("call")
     p.add_argument("json")
@@ -344,6 +345,7 @@ def main():
     p = sub.add_parser("studio")
     p.add_argument("--scenario", default=None, help="default: MAST shot 20689 hands-off if the workspace has it, else studio_iter")
     p.add_argument("--port", type=int, default=8801)
+    p.add_argument("--allow-python", action="store_true", help="accept decision {\"kind\": \"python\"}, which runs a named Python function")
     p.set_defaults(f=cmd_studio)
     p = sub.add_parser("smoke")
     p.add_argument("--limit", type=int, default=3600, help="seconds per check")

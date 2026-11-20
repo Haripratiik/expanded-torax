@@ -37,7 +37,7 @@ and only what the gyrotrons can deliver reaches the plasma.
       {"kind": "net", "model": "runs/torax_shots/forecaster.npz", "cost": 0.03, "chip": false}
                                                                          a forecaster with MPC; chip: true is 16-bit fixed point; "hgq",
                                                                          with "hgq_model", the exported chip design, bit for bit
-      {"kind": "python", "target": "module:function", "args": {...}}     your own: function(P_max=..., physics=..., **args) returns a
+      {"kind": "python", "target": "module:function", "args": {...}}     your own (a module, or a file as path/to/file.py:function): function(P_max=..., physics=..., **args) returns a
                                                                          callable taking obs and returning (power in MW, aim in rho_norm)
       {"kind": "etched", "final": true, "controller": "sim chip + decision chip", "seed": 0}  the companion chip project's chip, at its own 0.1 ms and 20 ms, in its own process (chip_server.py). The island's width and
                                                                          rotation then follow that project's model, fed by TORAX's plasma every step, and TORAX receives the width and the mean drive
@@ -306,8 +306,17 @@ def decision_model(spec, P_max, coeffs, dt=0.5):
         model = [fc.load_model(p, k=4) for p in model] if isinstance(model, list) else fc.load_model(model, k=4, hgq=spec.get("hgq_model"))
         return fc.NetMPC(model, P_max=P_max, energy_cost=spec.get("cost", 0.03), chip=chip, dw_steps=max(int(round(0.5 / dt)), 1))
     if kind == "python":
-        module, function = spec["target"].split(":")
-        return getattr(importlib.import_module(module), function)(P_max=P_max, physics=coeffs, **spec.get("args", {}))
+        module, function = spec["target"].rsplit(":", 1)
+        if module.endswith(".py"):          # a file of your own, by path: absolute, from the working folder, or from the repository
+            import importlib.util
+            here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", module)
+            path = module if os.path.isabs(module) or os.path.exists(module) else here
+            loader = importlib.util.spec_from_file_location(os.path.splitext(os.path.basename(path))[0], path)
+            mod = importlib.util.module_from_spec(loader)
+            loader.loader.exec_module(mod)
+        else:
+            mod = importlib.import_module(module)
+        return getattr(mod, function)(P_max=P_max, physics=coeffs, **spec.get("args", {}))
     raise ValueError(f"unknown decision model {kind}")
 
 
@@ -427,7 +436,7 @@ class Harness:
         pedestal="scale the pedestal top, until changed: T, n (a back transition: T 0.5)",
         couple="all the models on one plasma, from now on, with no number fitted to a machine (coupled.py): L-H, the edge, density, ELMs, sawteeth, islands and their seeds, the beta limit. models: which of them; H0: H-mode now; n_line: the density programme in m^-3, a number or {t: value} (without one, the Greenwald fraction it has now is held); machine: its name in machines.py",
         pedestal_model="the pedestal's height and place from EPED-NN, from now on: name (EPED1NNmodel, EPED1NNensemble, or off), interval s",
-        quench="what follows the onset (H78). On a MAST shot of the hands-off set, FreeGSNKE from the shot's EFIT at this moment with the run's beta_pol: mode static (default, about a minute): which way the plasma goes once the pressure is gone, from static equilibria (checked on real MAST disruptions), with MAST's measured quench length for that way; growth: 1 adds the vertical growth rate (about 100 s more); mode full: the time-dependent run, hours, with the probes read through it. On other machines, DREAM (1D) in WSL with the run's current, size, field, core temperature and density: material none, neon or neon+deuterium, arrive_ms after the onset (0: with the thermal quench), tpost the held temperature in eV; returns the runaway current and the quench time against ITER's limits. Adds quench_2d or quench_dream to the disruption card",
+        quench="what follows the onset. On a MAST shot of the hands-off set, FreeGSNKE from the shot's EFIT at this moment with the run's beta_pol: mode static (default, about a minute): which way the plasma goes once the pressure is gone, from static equilibria (checked on real MAST disruptions), with MAST's measured quench length for that way; growth: 1 adds the vertical growth rate (about 100 s more); mode full: the time-dependent run, hours, with the probes read through it. On other machines, DREAM (1D) in WSL with the run's current, size, field, core temperature and density: material none, neon or neon+deuterium, arrive_ms after the onset (0: with the thermal quench), tpost the held temperature in eV; returns the runaway current and the quench time against ITER's limits. Adds quench_2d or quench_dream to the disruption card",
         free_boundary="plasma shape from FreeGSNKE, from now on: machine (ITER, or MAST on a MAST shot, with the shot's coil traces), mode (control: the coils keep the boundary; coils: the coils stay; off), interval s (default half an energy time, at least ten steps), shape (machine: the programme's in machines.py; plasma: the boundary TORAX holds now; auto, the default: the machine's if the run started from it), growth (also the vertical growth rate, about 25 s; ITER only)",
         turbulence="a burst: multiply transport by factor inside rho [a, b] for duration s; channel heat, e, i, particles or all",
         turbulence_noise="a random transport field: log-normal with sigma, correlation tau s and length in rho; rho [a, b], duration, channel, seed",
@@ -806,8 +815,8 @@ class Harness:
             else:
                 args = ["late", "--tpost", repr(float(c.get("tpost", 10.0))), "--arrive", repr(at), "--ne", repr(nne), "--nd", repr(nnd)]
             name = f"harness_{tag}"
-            bash = (f"cd {wsl_path(root)} && export XTORAX_HOME={wsl_path(root)} DREAMPATH={os.environ.get('XTORAX_DREAMPATH', '$HOME/build/DREAM')} PYTHONDONTWRITEBYTECODE=1 && "
-                    f"{os.environ.get('XTORAX_DREAM_PYTHON', '~/venvs/aurora/bin/python')} {wsl_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dream_iter.py'))} "
+            bash = (f"cd {wsl_path(root)} && export XTORAX_HOME={wsl_path(root)} DREAMPATH={os.environ.get('XTORAX_DREAMPATH', '$HOME/DREAM')} PYTHONDONTWRITEBYTECODE=1 && "
+                    f"{os.environ.get('XTORAX_DREAM_PYTHON', 'python3')} {wsl_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dream_iter.py'))} "
                     + " ".join(args) + f" --tend {float(c.get('tend', 0.3))} --name {name} --set " + " ".join(f"{k}={v:.6g}" for k, v in sets.items()))
             done = subprocess.run(["wsl.exe", "--exec", "bash", "-lc", bash] if os.name == "nt" else ["bash", "-lc", bash], capture_output=True, text=True, timeout=float(c.get("timeout", 3600)))
             line = [x for x in done.stdout.splitlines() if x.startswith("{")]
