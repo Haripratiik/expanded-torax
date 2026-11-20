@@ -5,7 +5,7 @@ const css = name => getComputedStyle(document.documentElement).getPropertyValue(
 // each pen's dash (--dash-N, "none" for a solid line) and a key swatch drawn with it, so pens one hue apart still read apart
 const dashOf = n => { const v = css(`--dash-${n}`); return v && v !== "none" ? v.split(/\s+/).map(Number) : []; };
 const swatch = n => { const c = css(`--s${n}`), d = dashOf(n); if (!d.length) return c; let x = 0; const stops = d.map((len, j) => { const s = `${j % 2 ? "transparent" : c} ${x}px ${x + len}px`; x += len; return s; }); return `repeating-linear-gradient(90deg, ${stops.join(", ")})`; };
-const MONO = '11px "Martian Mono", ui-monospace, monospace';
+const MONO = '11px Arial, "Helvetica Neue", Helvetica, sans-serif';      // TORAX's plots are set in Arial
 const fmt = (v, d = 3) => v == null || !isFinite(v) ? "-" : Math.abs(v) >= 1e4 || (v !== 0 && Math.abs(v) < 1e-2) ? v.toExponential(2) : +v.toPrecision(d) + "";
 
 const S = { rev: -1, n: 0, nf: 0, t: [], data: {}, frames: [], meta: null, st: {}, cursor: null, pinned: false, window: 30, zoom: null, active: [], heat: "T_e", tab: "Instabilities", ghost: null, dirty: true, pf4: "chi", measured: null, measuredAt: null, flash: { elm: -1e9, saw: -1e9 }, hits: {}, counts: {} };
@@ -307,7 +307,7 @@ function drawStrips(R, cursorT) {
       const tg = gh.map(r => r.t);
       for (const k of keys) { const v = gh.map(r => r[k] == null ? NaN : r[k]); pen(g, tg, v, scaleOf(k), R, w, Y, d.step); }
     }
-    g.lineWidth = 1.5;
+    g.lineWidth = 2;
     for (const k of keys) { g.strokeStyle = css(`--s${slotOf(k)}`); g.setLineDash(dashOf(slotOf(k))); pen(g, t, S.data[k], scaleOf(k), R, w, Y, d.step); }
     g.setLineDash([]);
     g.fillStyle = col.measured;
@@ -392,8 +392,8 @@ function drawRug(R, cursorT) {
   const i0 = Math.max(lower(t, R[0]), 0), i1 = lower(t, R[1]) + 1;
   g.lineWidth = 1;
   const marks = (key, color, top) => { const v = S.data[key]; if (!v) return; g.strokeStyle = css(color); for (let i = i0; i < Math.min(i1, t.length); i++) if (v[i] > 0) vline(g, X(t[i], R, w), top, h - 1); };
-  marks("elm", "--s3", h - 7);
-  marks("sawtooth", "--ink", h - 14);
+  marks("elm", "--ev-elm", h - 7);
+  marks("sawtooth", "--ev-crash", h - 14);
   g.font = MONO; g.textBaseline = "top"; g.textAlign = "left"; g.fillStyle = css("--ink");
   let lastX = -1e9;
   const st = S.st;
@@ -851,6 +851,15 @@ $("pin-clear").onclick = () => { S.pinned = false; S.cursor = null; S.zoom = nul
 let marks = 0;
 $("branch").onclick = async () => { marks += 1; const a = await api("/api/branch", { name: `mark ${marks}` }); toast(a.error || `mark ${marks} at ${fmt(a.t, 5)} s`, !!a.error); };
 $("rewind").onclick = async () => { const n = $("branches").value; if (!n) return toast("no mark to go back to", true); const a = await api("/api/rewind", { name: n }); if (a.error) toast(a.error, true); else { const q = S.st.ghosts ? S.st.ghosts.length : 0; S.ghost = await api(`/api/ghost?i=${q}`); } };
+// the theme: Plotly's plotly_dark by default, Plotly's default template (TORAX's own look) on request, remembered in this browser
+(() => {
+  const sel = $("theme");
+  let saved = null;
+  try { saved = localStorage.getItem("xtorax-theme"); } catch (e) { /* storage blocked: keep the default */ }
+  const apply = v => { document.documentElement.dataset.theme = v; sel.value = v; S.dirty = true; };
+  apply(saved === "light" ? "light" : "dark");
+  sel.onchange = () => { apply(sel.value); try { localStorage.setItem("xtorax-theme", sel.value); } catch (e) { /* storage blocked */ } };
+})();
 addEventListener("keydown", e => {
   if (e.target.closest("input, select, textarea")) return;
   if (e.code === "Space") { e.preventDefault(); $("run").click(); }

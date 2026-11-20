@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="A live console for a simulated tokamak plasma: run it, fire instabilities and actuators, and watch its traces, profiles and cross-section.">
 <title>Plasma harness</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Martian+Mono:wdth,wght@75..112.5,400..700&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -27,6 +25,7 @@
     <button id="branch" title="Remember this moment">Mark</button>
     <label class="field"><span>Back to</span><select id="branches"><option value="">no marks</option></select></label>
     <button id="rewind" title="Go back to the mark. What ran since stays as a grey trace.">Rewind</button>
+    <label class="field"><span>Theme</span><select id="theme"><option value="dark">Dark</option><option value="light">Light</option></select></label>
   </div>
 </header>
 
@@ -65,7 +64,7 @@
     </div>
     <div id="strip-menu" class="menu" hidden></div>
     <div class="tape">
-      <div class="track rug-track"><div class="track-head"><b>Events</b><span class="key-mark"><i class="short" style="background:var(--s3)"></i>ELM</span><span class="key-mark"><i style="background:var(--ink)"></i>crash</span></div><canvas id="rug" class="rug" aria-label="Events"></canvas></div>
+      <div class="track rug-track"><div class="track-head"><b>Events</b><span class="key-mark"><i class="short" style="background:var(--ev-elm)"></i>ELM</span><span class="key-mark"><i style="background:var(--ev-crash)"></i>crash</span></div><canvas id="rug" class="rug" aria-label="Events"></canvas></div>
       <div id="strips"></div>
       <div class="track heat-track">
         <div class="track-head"><b>Against radius</b><select id="heat-field" aria-label="Field against radius and time"></select><small id="heat-note"></small></div>

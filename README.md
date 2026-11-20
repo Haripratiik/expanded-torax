@@ -4,10 +4,6 @@ A whole-device tokamak simulator built on [TORAX](https://github.com/google-deep
 
 I built it to test real-time control chips and neural surrogates: on plasmas checked against real MAST shots, and on ITER, SPARC and MAST-U, which no shot here can check and which are labelled as such.
 
-![The front end on ITER's hybrid scenario, paused at 81.4 s: a 2/1 island seeded at 6 cm, and the 20 MW of ECCD the scenario's rule fires at it](docs/studio_iter.png)
-
-*The front end on ITER's hybrid scenario, paused at 81.4 s: a 2/1 island seeded at 6 cm, and the 20 MW of ECCD the scenario's rule fires at it.*
-
 **Status.** Version 12 of the plasma settings, frozen on 9 November 2026, in package release 1.2. It runs whole MAST shots hands-off from their first measured frame and meets 6 of the 12 accuracy bars set for it, one of which, the plasma current, is given as the programme. It is a test bench whose limits are measured, not a twin that matches shots: read [How far to trust it](#how-far-to-trust-it) before using any number it gives. The ITER and test scenarios run from this repository as they are; the MAST results need shot files that cannot yet be rebuilt from it alone ([MAST shots](#mast-shots)).
 
 New to tokamaks? [Words used here](#words-used-here) explains the terms.
@@ -196,7 +192,7 @@ The servers listen on 127.0.0.1 and answer this machine only: a request whose Ho
 
 ## The front end
 
-`python xtorax.py studio` serves a page at http://127.0.0.1:8801 with the plasma's live traces, profile maps, the cross-section, the console of actuators and instabilities, branches, and, on a real shot, what MAST measured beside the simulation. It starts on MAST shot 20689 if the workspace has its files, otherwise on `studio_iter`; `--scenario` picks another.
+`python xtorax.py studio` serves a page at http://127.0.0.1:8801 with the plasma's live traces, profile maps, the cross-section, the console of actuators and instabilities, branches, and, on a real shot, what MAST measured beside the simulation. It starts on MAST shot 20689 if the workspace has its files, otherwise on `studio_iter`; `--scenario` picks another. It is drawn the way TORAX draws its own runs, in Plotly's style: dark by default (Plotly's plotly_dark template), and the Theme menu switches to Plotly's light template, the look of TORAX's figures.
 
 ## How far to trust it
 
@@ -359,7 +355,6 @@ A variable names that piece's Python (or folder); without it the tools look in t
 | `examples/` | the quick start's script and session, a decision model of your own and its session, an ITER agent session, a MAST session |
 | `data/` | EPED-NN's weights and their check outputs (`epednn/`), and the reactor check's reference trace |
 | `env/` | the package lists of the four environments, as frozen on 9 November 2026 |
-| `docs/` | the picture at the top of this file |
 | `AGENTS.md` | the operating manual for an AI agent driving the harness |
 
 Results, MAST data and outside tools live in a workspace: `XTORAX_HOME` if set, else the repository itself. Results and data go in its `runs/twin/`, outside tools in its `external/`; git ignores both.
@@ -395,7 +390,7 @@ Module headers and comments cite tests by code (H34 to H91) and files under `doc
 |---|---|---|
 | 1.0, 9 November 2026 | version 12 frozen and packaged | the reference set |
 | 1.1, 9 November 2026 | exact branches; pellets sized by the machine's injector | unchanged: shot 20689 identical on all 46 scores |
-| 1.2, 19 November 2026 | the public repository: a workspace and outside tools set by variables, EPED-NN's weights and the reactor check's reference shipped, servers that answer this machine only, decision models from a file, the front end redesigned | unchanged: the plasma settings are version 12's |
+| 1.2, 19 November 2026 | the public repository: a workspace and outside tools set by variables, EPED-NN's weights and the reactor check's reference shipped, servers that answer this machine only, decision models from a file, the front end restyled after TORAX's own Plotly figures | unchanged: the plasma settings are version 12's |
 
 **Branches in 1.1.** In 1.0 a snapshot kept TORAX's state, the reactor's islands and ELM clock, the plant and the harness's own lists, but not the models a step calls, so a restored branch carried on with the last branch's coupled plasma: on 20689 a null branch run after a branch that fired a pellet, gas, an island and heating was in H-mode from its first step, because the fired branch was. An AI agent driving the harness found the transport table leaking the same way. A snapshot now also holds every model on the step (the coupled plasma's random draws, H-mode, collapse and density-loop state, the transport table, EPED-NN's schedule, the free boundary's client), the reactor's carried readings, the free boundary's geometry, the ELM draws, and FreeGSNKE's own state. Measured: on MAST 20689 with FreeGSNKE and on ITER with FreeGSNKE and EPED-NN, the null branch and a second restore repeat the first run exactly on every record (74 and 42 quantities, 40 steps each); a snapshot takes 0.01 s and a restore 0.01 to 0.04 s.
 
