@@ -18,6 +18,10 @@ FreeGSNKE (https://github.com/FusionComputingLab/freegsnke), GNU LGPL 3.0.
 
 KN1DPy, GNU LGPL 3.0. Optional. Not shipped; run as a separate process (core/kn1d_server.py).
 
+TurbulentTransport.jl (https://github.com/ProjectTorreyPines/TurbulentTransport.jl), Apache License 2.0.
+  Optional. Not shipped: core/tglfnn_bson.py reads the network files of the user's own clone and writes them out as JSON in the
+  workspace, for the transport option in core/tglfnn_st.py.
+
 DREAM (https://github.com/chalmersplasmatheory/DREAM). Optional. Not shipped; run as a separate process (core/dream_iter.py).
 
 FAIR-MAST (S. Jackson et al., SoftwareX 27, 101869 (2024); public object store https://s3.echo.stfc.ac.uk, bucket mast) and its

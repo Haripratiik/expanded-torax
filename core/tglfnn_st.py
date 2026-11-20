@@ -3,7 +3,7 @@
 The networks are ProjectTorreyPines' (TurbulentTransport.jl, Apache-2.0; Neiser et al.): TGLF SAT3, electromagnetic, trained on MAST-U and NSTX profiles,
 positive and negative triangularity, one network for the core (r/a below 0.881), one for the near edge (to 0.975) and one for the edge, each the mean of
 20 members, blended by radius as that package does. They were written out as plain numbers by tglfnn_bson.py, whose port matches the package's own test
-values to 1e-14. Nothing of ours is fitted: the inputs are TORAX's TGLF inputs (tglf_based_transport_model, GACODE's definitions and units, which are
+values to 1e-14. Nothing is fitted here: the inputs are TORAX's TGLF inputs (tglf_based_transport_model, GACODE's definitions and units, which are
 the ones the networks were trained on), and the fluxes go back through TORAX's own conversion.
 
 What TORAX does not have is set to zero: squareness and its shear, the vertical shift and its gradient, and the parallel flow and its shear. ExB shear is
