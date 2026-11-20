@@ -13,7 +13,7 @@ forbid modifying it. Each step the twin computes, at the q = 1 surface:
   the form of Chapman's review, and that is what TORAX's simple trigger is given each step; (14) sets it to zero.
 Left out, on purpose: the fast-ion terms (eq. 13 and dW_fast), until the twin's fast-ion content agrees with what EFIT allows (H83: it is 2 to 4 times too high, and at that level
 the fast-ion fluid drive flips the result, docs/lit/40, 1.6); rotation, which MAST's periods depend on and Porcelli lacks. The large aspect ratio expansions are used at eps1 about 0.3,
-outside their stated range: untested at MAST's aspect ratio anywhere we found. No coefficient is set on MAST.
+outside their stated range: untested at MAST's aspect ratio in any source found. No coefficient is set on MAST.
 """
 import numpy as np
 

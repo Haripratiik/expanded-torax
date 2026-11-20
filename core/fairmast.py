@@ -1,10 +1,10 @@
-"""FAIR-MAST level 1 data for the twin (H85): download a diagnostic group of development shots from the public store (s3.echo.stfc.ac.uk, bucket mast,
-level1/shots/<shot>.zarr/<group>/), and read it back. Development shots only: runs/twin/dev_shots.json (written by dev_shots.py from the chip project's own split) lists them,
-and any other shot is refused, so none of the chip project's held-out shots is ever fetched.
+"""FAIR-MAST level 1 data for the twin (H85): download a diagnostic group of shots from the public store (s3.echo.stfc.ac.uk, bucket mast,
+level1/shots/<shot>.zarr/<group>/), and read it back. When the workspace keeps a list of development shots
+(runs/twin/dev_shots.json, {"development": [shot, ...]}), any other shot is refused, so shots held out for testing are never fetched by mistake.
 
 Groups used so far: anb (the beams' analysed power per line, SS and SW, split into full, half and third energy, MW); aga (gas: the fast ion gauge in D2 per m^3, valve flows in electrons
 per second); abm (the bolometers).
-Usage (its own venv, external/fairmast-venv: zarr 2, numcodecs, requests):
+Usage (its own environment, XTORAX_FAIRMAST_PYTHON or external/fairmast-venv: zarr 3, numcodecs, requests):
   $XTORAX_FAIRMAST_PYTHON -I core/fairmast.py get anb 22235 20689 ...
   $XTORAX_FAIRMAST_PYTHON -I core/fairmast.py get anb --twin        (the 25 shots of the H82 and d84 sets)
 Writes external/data/fairmast_l1/<shot>.zarr/<group>/ (plain Zarr v2 directory stores, data only).

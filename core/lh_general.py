@@ -1,5 +1,5 @@
 """The L-H threshold with published multi-machine numbers (H49, docs/lit/28), and whether it says when MAST is in H-mode. Martin 2008 for the conventional machines it was fitted on, 2/M from Delabie 2026, the low-density branch at 0.35 of the Greenwald density (0.23 to 0.46 on AUG, C-Mod, JET and MAST), the power that crosses the separatrix as P_ohm + P_abs - dW/dt.
-Spherical tokamaks: Takizuka 2004's aspect-ratio term stays 3 to 8 times low on later MAST, and measured thresholds at low aspect ratio are about 8 times Martin on MAST (A 1.3), 5 to 10 on NSTX (A 1.3), 7 to 15 on Pegasus (A 1.2), with the ratio growing as A falls (Howlett 2023, Kaye 2011, Thome 2017). (3 / A)^2.2 below A = 3 carries those three. The form and exponent are mine, from those published numbers; no shot of ours set them.
+Spherical tokamaks: Takizuka 2004's aspect-ratio term stays 3 to 8 times low on later MAST, and measured thresholds at low aspect ratio are about 8 times Martin on MAST (A 1.3), 5 to 10 on NSTX (A 1.3), 7 to 15 on Pegasus (A 1.2), with the ratio growing as A falls (Howlett 2023, Kaye 2011, Thome 2017). (3 / A)^2.2 below A = 3 carries those three. The form and exponent were chosen to carry those published numbers; no MAST shot of this project set them.
 Usage (TORAX's venv): python -I core/lh_general.py
 """
 import json

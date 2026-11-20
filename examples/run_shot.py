@@ -1,5 +1,6 @@
-"""A MAST shot hands-off from Python, with the recommended version: the run natural.py makes, stepped here. Development shots only.
-Usage (project root): python examples/run_shot.py [shot] [ms]"""
+"""A MAST shot hands-off from Python, with the recommended version: the run natural.py makes, stepped here. Needs MAST shot files
+in the workspace (README.md, "MAST shots"), and FreeGSNKE.
+Usage (from the repository): python examples/run_shot.py [shot] [ms]"""
 import os
 import sys
 

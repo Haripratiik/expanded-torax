@@ -63,7 +63,7 @@ def main():
     print("all steps did what they say", flush=True)
 
 
-def mast(shot=20689, window=0.03):     # a development shot: never one of the chip project's held-out shots
+def mast(shot=20689, window=0.03):     # a development shot, never a held-out one
     """The same command on a real MAST shot, and the hands-off run the front end loads: FreeGSNKE on the shot's coil traces, against EFIT's boundary."""
     import numpy as np
     import natural

@@ -71,7 +71,7 @@ function reset() {
 async function poll() {
   try {
     const q = await api(`/api/trace?since=${S.n}&frames=${S.nf}&rev=${S.rev}`);
-    if (typeof q.rev !== "number") throw new Error(q.error || "no trace");   // an error reply, or a proxy's page while the server starts: keep our place
+    if (typeof q.rev !== "number") throw new Error(q.error || "no trace");   // an error reply, or a proxy's page while the server starts: keep the current place
     if (q.rev !== S.rev) { reset(); S.rev = q.rev; if (S.meta && q.scenario !== S.meta.scenario) await loadMeta(); }
     merge(q);
     const ready = S.st.state === "loading" && q.state !== "loading";

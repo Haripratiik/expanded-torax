@@ -1,6 +1,6 @@
 """Island-width forecaster and the controllers built on it, for the simulated reactor (H35).
 
-Training data: the synthetic shots (experiments/torax/make_shots.py). One sample per step t and horizon k (1, 4, 8 steps:
+Training data: synthetic shots from the simulated reactor (their generator is not part of this release). One sample per step t and horizon k (1, 4, 8 steps:
 0.5, 2, 4 s). Inputs, all things a real plant measures or sets: island width w_t, its change over the last step, the
 bootstrap current density at the surface (MA/m^2), the surface position (rho_norm), and over the next k steps the mean
 ECCD power (MW) and mean misalignment |aim - surface| (cm). Target: w_(t+k) - w_t (cm). The width inputs get Gaussian

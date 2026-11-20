@@ -86,43 +86,6 @@
    "oracle": false,
    "horizon": 2,
    "cost": 0.15
-  },
-  "net": {
-   "kind": "net",
-   "cost": 0.03
-  },
-  "chip": {
-   "kind": "net",
-   "cost": 0.03,
-   "chip": "hgq",
-   "hgq_model": "runs/torax_chip/hgq_forecaster.npz"
-  },
-  "etched": {
-   "kind": "etched",
-   "final": true,
-   "seed": 0,
-   "cl": -1.0
-  },
-  "fast_rule": {
-   "kind": "etched",
-   "final": true,
-   "controller": "plain rule (fast detection, modulated)",
-   "seed": 0,
-   "cl": -1.0
-  },
-  "iter_like": {
-   "kind": "etched",
-   "final": true,
-   "controller": "detect-then-suppress, 0.15 s",
-   "seed": 0,
-   "cl": -1.0
-  },
-  "chip_none": {
-   "kind": "etched",
-   "final": true,
-   "controller": "no control",
-   "seed": 0,
-   "cl": -1.0
   }
  }
 }

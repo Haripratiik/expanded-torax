@@ -1,6 +1,6 @@
 """Island model for TORAX: neoclassical tearing modes (NTMs) evolved alongside TORAX's profiles (H34, docs/ideas.md).
 
-TORAX has no island model. This module runs TORAX's own compiled step from a loop of ours (TORAX is not modified) and,
+TORAX has no island model. This module runs TORAX's own compiled step from its own loop (TORAX is not modified) and,
 after every step, for each mode m/n:
   1. finds the rational surface q = m/n (outermost crossing) on TORAX's q profile;
   2. reads TORAX's quantities there (bootstrap current and pressure just outside the island, where TORAX's profiles are
@@ -397,7 +397,7 @@ transport.register_transport_model(BohmGyroBohmTable)
 
 
 class TGLFNNTable(transport_pydantic.TGLFNNukaeaTransportModel):
-    """The UKAEA TGLF surrogate with the turbulence table and islands' conduction: anchored at the start, then TGLF says how transport changes. TORAX's own wrapper of it, no numbers of ours."""
+    """The UKAEA TGLF surrogate with the turbulence table and islands' conduction: anchored at the start, then TGLF says how transport changes. TORAX's own wrapper of it, with no numbers added here."""
     model_name: Annotated[Literal["tglfnn-ukaea_table"], torax_pydantic.JAX_STATIC] = "tglfnn-ukaea_table"
 
     def build_transport_model(self):

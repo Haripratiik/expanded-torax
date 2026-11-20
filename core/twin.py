@@ -39,7 +39,7 @@ and only what the gyrotrons can deliver reaches the plasma.
                                                                          with "hgq_model", the exported chip design, bit for bit
       {"kind": "python", "target": "module:function", "args": {...}}     your own (a module, or a file as path/to/file.py:function): function(P_max=..., physics=..., **args) returns a
                                                                          callable taking obs and returning (power in MW, aim in rho_norm)
-      {"kind": "etched", "final": true, "controller": "sim chip + decision chip", "seed": 0}  the companion chip project's chip, at its own 0.1 ms and 20 ms, in its own process (chip_server.py). The island's width and
+      {"kind": "etched", "final": true, "controller": "sim chip + decision chip", "seed": 0}  a separate, unpublished project's chip, not part of this release, at its own 0.1 ms and 20 ms, in its own process (XTORAX_CHIP_SERVER starts it). The island's width and
                                                                          rotation then follow that project's model, fed by TORAX's plasma every step, and TORAX receives the width and the mean drive
   torax                     any TORAX settings, merged over the base config (time-dependent inputs included)
 The decision model's observation is described in ntm.run. A model that handles one mode is pointed at the largest measured island.
@@ -153,7 +153,7 @@ def injector(s, modes):
 
 
 class ChipClient:
-    """chip_server.py in WSL, where the chip's Keras models live; TORAX lives on Windows. One line of JSON each way per TORAX step. One server per process, kept between decision models."""
+    """The etched chip's server, a process of its own (on Windows, in WSL), started by XTORAX_CHIP_SERVER; the chip is not part of this release. One line of JSON each way per TORAX step. One server per process, kept between decision models."""
     live = {}
 
     def __init__(self, final, background):
@@ -162,8 +162,9 @@ class ChipClient:
             raise RuntimeError("the etched chip is not part of this release: its networks and its server belong to a separate project. "
                                "XTORAX_CHIP_SERVER may name a shell command that starts a server speaking the same protocol (one line of JSON each way).")
         flags = ("--final_chip " if final else "") + (f"--background {background} " if background else "")
-        os.makedirs(os.path.join("runs", "twin"), exist_ok=True)
-        self.log = open(os.path.join("runs", "twin", "chip_server.log"), "w")
+        logs = os.path.join(os.path.abspath(os.environ.get("XTORAX_HOME") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")), "runs", "twin")
+        os.makedirs(logs, exist_ok=True)
+        self.log = open(os.path.join(logs, "chip_server.log"), "w")
         argv = ["wsl.exe", "-e", "bash", "-lc", server + " " + flags] if os.name == "nt" else ["bash", "-lc", server + " " + flags]
         self.p = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.log, text=True, bufsize=1)
         self._read()
@@ -881,7 +882,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("scenario")
     ap.add_argument("--decision", default=None, help="override with a named decision from the scenario's 'decisions' table")
-    ap.add_argument("--out", default=os.path.join("runs", "twin"))
+    ap.add_argument("--out", default=os.path.join(os.path.abspath(os.environ.get("XTORAX_HOME") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")), "runs", "twin"))
     args = ap.parse_args()
     s = json.load(open(args.scenario))
     if args.decision:

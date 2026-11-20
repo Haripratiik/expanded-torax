@@ -21,7 +21,7 @@ def need(out, keys, what):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", choices=["mast", "iter"])
-    ap.add_argument("--shot", type=int, default=20689)      # a development shot: never one of the chip project's held-out shots
+    ap.add_argument("--shot", type=int, default=20689)      # a development shot, never a held-out one
     ap.add_argument("--t_mast", type=float, default=0.02, help="s run on the MAST shot before the quench")
     ap.add_argument("--settle", type=float, default=60.0, help="s run on ITER before the quench")
     args = ap.parse_args()

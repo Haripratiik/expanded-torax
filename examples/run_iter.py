@@ -3,7 +3,7 @@ the scenario lets current diffuse 200 times faster to settle (as TORAX's own exa
 Then a branch seeds a 4 cm 2/1 island and runs 3 s, and a second branch runs the same 3 s without it. The scenario's decision rule
 fires the gyrotrons at an island wider than 3 cm, so the first branch shows what the island and its ECCD cost.
 The commands are the harness's own (README.md, "The harness").
-Usage (from the repository): python examples/run_iter.py      a few minutes; the first step compiles TORAX's step with JAX"""
+Usage (from the repository): python examples/run_iter.py      about a minute; the first step compiles TORAX's step with JAX"""
 import json
 import os
 import sys

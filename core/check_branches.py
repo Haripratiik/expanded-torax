@@ -1,13 +1,13 @@
 """Branches come back exactly (package 1.1, H91). A snapshot; a run (A); back to the snapshot and a branch with things fired in it (P); back again and the
 same run as A (B); back once more (C). B and C must equal A in every record of every step: anything a step reads that the snapshot left out shows up here.
-The chip project's agent found the first such leak (the transport table) by comparing its null branches.
+An AI agent driving the harness found the first such leak (the transport table) by comparing its null branches.
 
 Cases: mast, a MAST shot hands-off with the recommended version and FreeGSNKE (the coupled plasma, the beams, the bolometer, MAST's free boundary);
 iter, TORAX's ITER plasma with FreeGSNKE and EPED-NN attached (the scenario studio_iter_coupled).
 
-Usage (TORAX's venv, project root):
+Usage (TORAX's environment, from the repository):
   python core/check_branches.py [--case mast iter] [--steps 40]
-  python core/check_branches.py --case mast --core experiments/torax      (the same on other code: package 1.0's copies)
+  python core/check_branches.py --case mast --core FOLDER      (the same check on another copy of core/, such as release 1.0's)
 """
 import argparse
 import json

@@ -1,7 +1,7 @@
 """MAST shots in the twin (H36, docs/digital-twin.md): the first accuracy test of TORAX against real profiles, on FAIR-MAST TokaMark v1 data.
 
 Two sides, because the store is zarr and TORAX's venv has no zarr:
-  select, convert   run in WSL with the chip project's venv, read the store read-only and write into runs/twin/mast/
+  select, convert   run in the zarr environment (XTORAX_FAIRMAST_PYTHON), read the store read-only and write into runs/twin/mast/
   backtest, report  run in TORAX's venv and read only runs/twin/mast/
 
 Selection rule, fixed before any TORAX run on a selected shot (RULE below; `select` writes it and its result to selection.json): shots of manifest.json with Thomson, EFIT, summary and charge
@@ -38,10 +38,10 @@ A run is scored with shot.score and shot.trust_window against the fits averaged 
 most trust windows at once. Persistence, the profile at the cut held for ever, is scored the same way: on a steady flat top it is the number to beat.
 tau_E = W_th / (0.7 P_NBI + V_loop Ip - dW_th/dt), median over the window, with W_th from the fits and EFIT's volume: the thermal energy, the only energy TORAX evolves. EFIT's stored energy W_dia is up to 4.5 times
 larger (fast ions and magnetics error, inferred), so tau_E from W_dia is saved as well (tau_E_wdia_s).
-Usage (WSL, read-only on the store, from the project root; never writes to ~/data):
-  python core/mast.py select
-  python core/mast.py convert [--dev]
-Usage (TORAX's venv, from the project root):
+Usage (the zarr environment, read-only on the store, from the repository; never writes to the store):
+  $XTORAX_FAIRMAST_PYTHON core/mast.py select
+  $XTORAX_FAIRMAST_PYTHON core/mast.py convert [--dev]
+Usage (TORAX's environment, from the repository):
   python core/mast.py calibrate
   python core/mast.py closure
   python core/mast.py backtest [--shots 27552 ...] [--models qlknn bgb constant bgb_dev constant_dev qlknn_clip] [--frozen] [--geometry circular] [--nbi_width 0.5] [--tag name]

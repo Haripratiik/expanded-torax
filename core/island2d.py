@@ -25,7 +25,7 @@ for sub in ("models", "solver"):
 
 def load_testbed():
     """solver/ntm.py, by path: core/ntm.py has the same name. The 2D solver and its surrogate belong to a separate project and are not
-    part of this release; the scenarios studio_iter_2d_* need them in the workspace (XTORAX_HOME/solver, XTORAX_HOME/models)."""
+    part of this release; a scenario with "plant2d" set needs them in the workspace (XTORAX_HOME/solver, XTORAX_HOME/models)."""
     import importlib.util
     if not os.path.exists(os.path.join(ROOT, "solver", "ntm.py")):
         raise RuntimeError("the 2D island solver (solver/ntm.py) is not part of this release; see README.md, 'Optional pieces'")
@@ -178,7 +178,7 @@ class Plant2D:
         self.active, self.steps_alive = False, 0                 # with no island nothing evolves: the slab sits in its equilibrium, and a surrogate is not asked to hold still for minutes, which it cannot do
         self.continuous_eff = spec.get("continuous_eff", 0.5)    # a drive that is not modulated on the O-point also lands on the X-point
         self.blown, self.walls, self.a_now = False, [], 0.0
-        self.flux_max = spec.get("flux_max", 0.5)                # past this the solver has shown nothing, in our runs its largest is about 0.6
+        self.flux_max = spec.get("flux_max", 0.5)                # past this the solver has shown nothing; in the runs made with it, its largest is about 0.6
         self.seed_events = []
         self.turns = 0                                           # how many times the island turned over
         self.small = 0
