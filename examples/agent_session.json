@@ -1,0 +1,12 @@
+[
+  {"cmd": "step", "until": 60},
+  {"cmd": "snapshot", "name": "flat_top"},
+  {"cmd": "island", "m": 2, "n": 1, "w_cm": 4},
+  {"cmd": "step", "until": 75},
+  {"cmd": "observe", "profiles": true},
+  {"cmd": "restore", "name": "flat_top"},
+  {"cmd": "step", "until": 61},
+  {"cmd": "spi", "species": "Ne"},
+  {"cmd": "step", "until": 62},
+  {"cmd": "quench", "material": "neon+deuterium", "arrive_ms": 0}
+]

@@ -1,0 +1,4 @@
+# TORAX 1.4.3 and the JAX it was tested with. requirements-lock.txt pins every package of the tested environment.
+torax==1.4.3
+jax==0.12.0.1
+jaxlib==0.12.0.1

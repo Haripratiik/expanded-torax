@@ -1,0 +1,14 @@
+{
+ "name": "ITER hybrid with the 2D full solver as its 2/1 island (slow)",
+ "t_final": 3000.0,
+ "dt": 0.1,
+ "edge": false,
+ "settle": 40.0,
+ "impurities": {"Ne": 0.01, "W": 1e-5, "Ar": 0.0, "N": 0.0, "Kr": 0.0},
+ "physics": {"a_bs": 1.5, "a_cd": 0.5},
+ "plant2d": {"backend": "solver"},
+ "gyrotrons": {"units": 20, "unit_MW": 1.0},
+ "sensors": {"sigma_w_cm": 0.3, "sigma_rho_cm": 0.5, "latency_steps": 1, "seed": 1},
+ "decision": {"kind": "none"},
+ "events": []
+}

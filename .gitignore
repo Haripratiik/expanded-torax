@@ -1,0 +1,12 @@
+# The workspace: results, MAST data and outside tools live here and stay local (README.md, "Where things live")
+runs/
+external/
+solver/
+models/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/

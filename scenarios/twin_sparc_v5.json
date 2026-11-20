@@ -1,0 +1,143 @@
+{
+ "name": "SPARC primary reference discharge, no tuning: QLKNN, FreeGSNKE, EPED-NN, one coupled loop. RF 25 MW (the installed power) to reach H-mode, then 11.1 MW (the reference), version 5 island",
+ "t_final": 16.0,
+ "dt": 0.02,
+ "edge": false,
+ "settle": 0.0,
+ "physical_current_after": 2.0,
+ "n_rho": 50,
+ "machine_start": {
+  "machine": "SPARC",
+  "Ip": 8700000.0,
+  "B0": 12.2,
+  "R0": 1.85
+ },
+ "physics": {
+  "a_bs": 1.5,
+  "a_cd": 0.5,
+  "a_ggj": 0.16666666666666666,
+  "k_pol": 2.5
+ },
+ "gyrotrons": {
+  "units": 4,
+  "unit_MW": 1.0
+ },
+ "sensors": {
+  "sigma_w_cm": 0.2,
+  "sigma_rho_cm": 0.5,
+  "latency_steps": 1,
+  "seed": 1
+ },
+ "decision": {
+  "kind": "none"
+ },
+ "rotation": {
+  "f0": 2000.0,
+  "tau_w": 0.05,
+  "f_lock": 20.0,
+  "quench_rate": 0.0,
+  "C_M": 3.0
+ },
+ "elms": {
+  "seed": 1
+ },
+ "torax": {
+  "plasma_composition": {
+   "main_ion": {
+    "D": 0.5,
+    "T": 0.5
+   },
+   "impurity": "Ne",
+   "Z_eff": 1.5
+  },
+  "profile_conditions": {
+   "Ip": 8700000.0,
+   "T_i": {
+    "0.0": {
+     "0.0": 15.0,
+     "1.0": 0.3
+    }
+   },
+   "T_e": {
+    "0.0": {
+     "0.0": 15.0,
+     "1.0": 0.3
+    }
+   },
+   "T_i_right_bc": 0.3,
+   "T_e_right_bc": 0.3,
+   "n_e_right_bc": 8e+19,
+   "n_e_nbar_is_fGW": true,
+   "normalize_n_e_to_nbar": true,
+   "nbar": 0.37,
+   "n_e": {
+    "0": {
+     "0.0": 1.3,
+     "1.0": 1.0
+    }
+   }
+  },
+  "numerics": {
+   "max_dt": 0.05
+  },
+  "pedestal": {
+   "T_i_ped": 4.0,
+   "T_e_ped": 4.0,
+   "n_e_ped": 2.6e+20,
+   "rho_norm_ped_top": 0.93
+  },
+  "sources": {
+   "generic_current": {
+    "fraction_of_total_current": 0.0
+   },
+   "generic_particle": {
+    "S_total": 0.0
+   },
+   "gas_puff": {
+    "S_total": 1e+21
+   },
+   "generic_heat": {
+    "P_total": 25000000.0,
+    "gaussian_location": 0.1,
+    "gaussian_width": 0.2,
+    "electron_heat_fraction": 0.5
+   }
+  }
+ },
+ "events": [
+  {
+   "t": 2.0,
+   "cmd": "free_boundary",
+   "machine": "SPARC",
+   "mode": "control",
+   "interval": 0.25
+  },
+  {
+   "t": 3.0,
+   "cmd": "couple",
+   "models": [
+    "hmode",
+    "elms",
+    "sawtooth",
+    "modes",
+    "collapse"
+   ],
+   "H0": true,
+   "n_line": 3.1e+20,
+   "machine": "SPARC",
+   "follow": {
+    "tau_share": 0.25,
+    "shape": "wall",
+    "length": 0.1,
+    "n_top_ratio": 0.71,
+    "ped_width": true
+   }
+  },
+  {
+   "t": 9.0,
+   "cmd": "heating",
+   "factor": 0.444
+  }
+ ],
+ "sawtooth": true
+}

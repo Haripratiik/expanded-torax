@@ -1,0 +1,24 @@
+Expanded TORAX
+Copyright 2026 The Expanded TORAX Authors
+
+Licensed under the Apache License, Version 2.0 (LICENSE).
+
+This repository builds on, ships or calls the following work.
+
+TORAX (https://github.com/google-deepmind/torax), Apache License 2.0.
+  Installed as a dependency (torax==1.4.3), not copied here. Its QLKNN transport model comes with it through fusion_surrogates.
+  Expanded TORAX is an independent project and is not affiliated with or endorsed by Google DeepMind.
+
+EPEDNN.jl (https://github.com/ProjectTorreyPines/EPEDNN.jl), Apache License 2.0.
+  data/epednn holds the weights of its EPED1NNmodel and EPED1NNensemble networks, written out as JSON, and its outputs on test
+  inputs (check.json); core/epednn.py evaluates them in numpy.
+
+FreeGSNKE (https://github.com/FusionComputingLab/freegsnke), GNU LGPL 3.0.
+  Optional. Not shipped: installed by the user in its own environment and run as a separate process (core/freegsnke_server.py).
+
+KN1DPy, GNU LGPL 3.0. Optional. Not shipped; run as a separate process (core/kn1d_server.py).
+
+DREAM (https://github.com/chalmersplasmatheory/DREAM). Optional. Not shipped; run as a separate process (core/dream_iter.py).
+
+FAIR-MAST (S. Jackson et al., SoftwareX 27, 101869 (2024); public object store https://s3.echo.stfc.ac.uk, bucket mast) and its
+TokaMark benchmark data. Not shipped. The MAST tools read a local copy that the user downloads under FAIR-MAST's own terms.

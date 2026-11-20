@@ -1,0 +1,12 @@
+[
+  {"cmd": "observe"},
+  {"cmd": "step", "n": 30},
+  {"cmd": "snapshot", "name": "before"},
+  {"cmd": "island", "m": 2, "n": 1, "w_cm": 3},
+  {"cmd": "step", "n": 30},
+  {"cmd": "observe"},
+  {"cmd": "restore", "name": "before"},
+  {"cmd": "gas", "species": "D", "rate": 5e21, "delay": 0.005, "duration": 0.02},
+  {"cmd": "step", "n": 30},
+  {"cmd": "observe", "profiles": true}
+]

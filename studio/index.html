@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plasma harness</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=B612+Mono:wght@400;700&family=B612:wght@400;700&family=Barlow+Condensed:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar">
+  <div class="mark">
+    <svg viewBox="0 0 26 34" width="20" height="26" aria-hidden="true"><path d="M7 2 C17 2 24 9 24 17 C24 25 17 32 7 32 C4 26 3.4 8 7 2 Z"/></svg>
+    <strong>Plasma harness</strong>
+  </div>
+  <label class="field"><span>Plasma</span><select id="scenario"></select></label>
+  <div class="keys" role="group" aria-label="Run controls">
+    <button id="run" class="key-run" title="Run or pause (space)">Run</button>
+    <button id="step" title="One TORAX step (s)">Step</button>
+    <label class="field"><span>Pace</span><select id="speed"><option value="0.2">0.2 x</option><option value="1" selected>1 x</option><option value="5">5 x</option><option value="20">20 x</option><option value="0">flat out</option></select></label>
+  </div>
+  <div class="clock"><span id="time">0.000</span><small>s</small></div>
+  <div class="state" id="state" role="status" aria-live="polite"><i aria-hidden="true"></i><span>loading</span></div>
+  <div class="keys end" role="group" aria-label="Branches">
+    <button id="branch" title="Remember this moment">Mark</button>
+    <label class="field"><span>Back to</span><select id="branches"><option value="">no marks</option></select></label>
+    <button id="rewind" title="Go back to the mark. What ran since stays as a grey trace.">Rewind</button>
+  </div>
+</header>
+
+<main>
+  <section class="left" aria-label="The machine">
+    <div class="port">
+      <canvas id="xsec" aria-label="Poloidal cross-section of the plasma"></canvas>
+      <div class="port-read" id="port-read"></div>
+    </div>
+    <p class="port-note" id="xs-note"></p>
+    <div class="scale"><span class="ramp" id="xs-ramp"></span><span id="xs-scale"></span></div>
+
+    <h2>Decision loop</h2>
+    <dl class="loop" id="loop">
+      <dt>Plasma</dt><dd id="loop-plasma">-</dd>
+      <dt>Sensors</dt><dd id="loop-sensors">-</dd>
+      <dt>Decision</dt><dd><span id="loop-decision">-</span>
+        <div class="row"><select id="decision" aria-label="Decision model"></select><button id="decision-apply">Use</button></div>
+      </dd>
+      <dt>Gyrotrons</dt><dd><span id="loop-gyro">-</span><div class="leds" id="leds" aria-label="Gyrotrons"></div></dd>
+    </dl>
+    <h2>Also in force</h2>
+    <ul class="flags" id="loops-on"></ul>
+    <div id="card" class="card" hidden></div>
+  </section>
+
+  <section class="centre" aria-label="The shot">
+    <figure class="plane" aria-label="How the models are coupled">
+      <figcaption>Coupling <small>every model plugged into TORAX's state; a lit line passed data in the last step</small></figcaption>
+      <svg id="plane" viewBox="0 0 1000 214" role="img" aria-label="Live diagram of the coupled models"></svg>
+    </figure>
+
+    <div class="record-head">
+      <h2>Shot record</h2>
+      <div class="row wrap">
+        <label class="field inline"><span>Window</span><select id="window"><option value="0">all</option><option value="0.1">0.1 s</option><option value="1">1 s</option><option value="10">10 s</option><option value="30" selected>30 s</option><option value="100">100 s</option></select></label>
+        <button id="add-strip">Traces</button>
+        <button id="pin-clear" hidden>Follow live</button>
+      </div>
+    </div>
+    <div id="strip-menu" class="menu" hidden></div>
+    <div class="tape">
+      <div class="track rug-track"><div class="track-head"><b>Events</b><span class="key-mark"><i style="background:var(--s4)"></i>ELM</span><span class="key-mark"><i style="background:var(--s7)"></i>crash</span></div><canvas id="rug" class="rug" aria-label="Events"></canvas></div>
+      <div id="strips"></div>
+      <div class="track heat-track">
+        <div class="track-head"><b>Against radius</b><select id="heat-field" aria-label="Field against radius and time"></select><small id="heat-note"></small></div>
+        <canvas id="heat" class="heat" aria-label="Profile against radius and time"></canvas>
+      </div>
+      <div class="track axis-track"><div class="track-head"></div><canvas id="axis" class="axis" aria-hidden="true"></canvas></div>
+    </div>
+    <div class="profiles" id="profiles"></div>
+    <details class="table-view"><summary>Table of the last values</summary><div id="table"></div></details>
+  </section>
+
+  <section class="right" aria-label="The console">
+    <nav class="tabs" role="tablist" id="tabs"></nav>
+    <div id="console" class="console"></div>
+  </section>
+</main>
+
+<div id="tooltip" class="tooltip" hidden></div>
+<div id="toast" class="toast" role="status" hidden></div>
+<div id="overlay" class="overlay"><div>
+  <svg viewBox="0 0 26 34" width="84" height="110" aria-hidden="true"><path class="trace-in" pathLength="100" d="M7 2 C17 2 24 9 24 17 C24 25 17 32 7 32 C4 26 3.4 8 7 2 Z"/></svg>
+  <p id="overlay-msg">starting</p>
+</div></div>
+<script src="app.js"></script>
+</body>
+</html>

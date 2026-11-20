@@ -1,0 +1,47 @@
+{
+ "name": "MAST 23906, from its real start, nothing measured afterwards",
+ "mast": {
+  "shot": 23906,
+  "model": "bgb",
+  "past": 0.3,
+  "natural": true,
+  "shots": "runs/twin/mast_natural2/shots"
+ },
+ "beams": true,
+ "dt": 0.001,
+ "edge": false,
+ "elms": false,
+ "impurities": {
+  "C": 0.0167,
+  "Ne": 0.0,
+  "Ar": 0.0
+ },
+ "physics": {
+  "a_bs": 1.5,
+  "a_cd": 0.5
+ },
+ "rotation": {
+  "f0": 9400.0,
+  "tau_M0": 0.02,
+  "tau_A0": 7e-07,
+  "tau_w": 0.005,
+  "dt": 1e-05,
+  "quench_rate": 25.0,
+  "f_lock": 100.0
+ },
+ "gyrotrons": {
+  "units": 4,
+  "unit_MW": 0.25,
+  "mirror_rate": 2.0
+ },
+ "sensors": {
+  "sigma_w_cm": 0.2,
+  "sigma_rho_cm": 0.5,
+  "latency_steps": 1,
+  "seed": 1
+ },
+ "decision": {
+  "kind": "none"
+ },
+ "events": []
+}

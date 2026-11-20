@@ -1,0 +1,26 @@
+name: quick start
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  quickstart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install
+        run: pip install -r requirements.txt
+      - name: What the workspace has
+        run: python xtorax.py env
+      - name: EPED-NN against EPEDNN.jl
+        run: python core/epednn.py check
+      - name: ITER, a branch with an island and one without
+        run: python examples/run_iter.py

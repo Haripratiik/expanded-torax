@@ -1,0 +1,11 @@
+[
+  {"cmd": "step", "n": 20},
+  {"cmd": "observe"},
+  {"cmd": "snapshot", "name": "before"},
+  {"cmd": "island", "m": 2, "n": 1, "w_cm": 4},
+  {"cmd": "step", "n": 30},
+  {"cmd": "observe"},
+  {"cmd": "restore", "name": "before"},
+  {"cmd": "step", "n": 30},
+  {"cmd": "observe"}
+]
