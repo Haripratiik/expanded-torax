@@ -1,6 +1,6 @@
 # AGENTS.md: operating Expanded TORAX
 
-For an AI agent (or a person) running the simulator and its harness. [README.md](README.md) says what each part is and how far to trust it, with every measured error and limitation; this file says how to operate it without breaking anything or fooling yourself. Work from the repository's folder with a Python that has TORAX 1.4.3:
+For an AI agent (or a person) running the simulator and its harness. [README.md](README.md) says what each part is, how to install and run it, and how far to trust it; [VALIDATION.md](VALIDATION.md) has every measured error and limitation; this file says how to operate it without breaking anything or fooling yourself. Work from the repository's folder with a Python that has TORAX 1.4.3:
 
 ```bash
 python xtorax.py <command>
@@ -34,7 +34,7 @@ These hold for every task. Breaking one makes results unusable or harms other wo
 | `serve SCENARIO [--port 8801]` | the harness as a local server | stays up |
 | `call 'JSON' [--port 8801]` | one command to a running server | per command |
 | `studio [--scenario S]` | the front end at http://127.0.0.1:8801 | stays up |
-| `smoke` | the functional checks, branches included; checks whose optional pieces are missing are skipped | 10 to 12 min with everything |
+| `smoke` | the functional checks, branches included; checks whose optional pieces are missing are skipped | about 4 min on a clean workspace, 10 to 12 with everything |
 
 Long commands (`run` on many shots, `serve`, `studio`, `smoke`) should run in the background with their output in a log; wait for them with a check on a file or the process, not with fixed sleeps.
 
@@ -47,7 +47,7 @@ python xtorax.py serve studio_iter --port 8801
 ```
 
 ```bash
-python xtorax.py call '{"cmd": "step", "until": 2}'
+python xtorax.py call '{"cmd": "step", "until": 40}'
 ```
 
 ```bash
@@ -62,7 +62,7 @@ python xtorax.py call '{"cmd": "island", "m": 2, "n": 1, "w_cm": 4}'
 python xtorax.py call '{"cmd": "restore", "name": "flat_top"}'
 ```
 
-Or a whole list at once: `python xtorax.py script studio_iter examples/iter_quickstart.json`. Scenarios are the files in `scenarios/`. The quoting above is for Git Bash or a Linux or macOS shell; in Windows PowerShell, put the commands in a file and use `script`.
+The first 25 s of `studio_iter` let current diffuse 200 times faster to settle, so branch after them, as above. Or a whole list at once: `python xtorax.py script studio_iter examples/iter_quickstart.json`. Scenarios are the files in `scenarios/`. The quoting above is for Git Bash or a Linux or macOS shell; in Windows PowerShell, put the commands in a file and use `script`.
 
 **From Python.** Put `core/` on `sys.path`; `twin.Harness(json.load(open("scenarios/studio_iter.json")))` builds a scenario's plasma, `h.apply({...})` takes the same commands, and `h.apply({"cmd": "observe"})` reads the plasma. `examples/run_iter.py` is a complete example. For a MAST shot, `natural.hands_off(shot)` returns the harness with the recommended version and FreeGSNKE on it as `h.free`; close FreeGSNKE with `h.free.close()` when done (`examples/run_shot.py`).
 
@@ -175,7 +175,7 @@ Actuators and instabilities, each tagged with its level (torax: TORAX's own mode
 - On Windows, call each environment's interpreter by path or through its variable. `python -I` leaves the script's own folder off the import path; the scripts in `core/` add it themselves, so keep them there.
 - FreeGSNKE and KN1D run as separate processes in their own environments, talking over pipes. A refused or failed solve keeps the last accepted shape; the start's solve is checked against EFIT's plasma and retried, or the run keeps EFIT's surfaces (`free.start` says which).
 - Fuelling by neutrals (`fuelling: kn1d_gauge`) calls KN1D every 10 ms of plasma time at 10 to 20 s each; it reads MAST's measured wall pressure, so it is an oracle, not a prediction.
-- ELMs, sawteeth, island seeds and some laws are drawn per run from seeds, and even the same seed is not always repeated exactly: one shot run twice gave q95 errors of 3.0% and 3.3% (floating-point drift, README.md). Compare statistics over shots or seeds, never one run against another.
+- ELMs, sawteeth, island seeds and some laws are drawn per run from seeds, and even the same seed is not always repeated exactly: one shot run twice gave q95 errors of 3.0% and 3.3% (floating-point drift, VALIDATION.md, "Repeat runs"). Compare statistics over shots or seeds, never one run against another.
 - Branches are exact from release 1.1: within one process, a restore brings back every model on the step and FreeGSNKE's own state, so a null branch repeats the first run on every record (`core/check_branches.py`). A free boundary built inside a branch is closed on restore; if FreeGSNKE's server stopped after a snapshot, that snapshot cannot be restored.
 - Pellets: MAST's injector made 0.6 to 2.4e20 atoms per pellet (1.1 to 1.7 mm), 0.44 to 1.64 of the electrons of a low-density plasma such as 20689's; smaller pellets are a what-if beyond MAST's hardware, so label them. The line density jumps at once and decays over about 12 ms, then sits 1 to 3.5% below the null branch for a few tens of ms while version 12's density loop rebuilds its source: read a pellet's response against its null branch, and the first 10 to 20 ms most. A pellet past the Greenwald density ends the shot only with `limits` on.
 - A run that ends early either stopped on TORAX's numerical checks (`sim_error`) or disrupted on its own (`disrupted`); `xtorax.py ready` separates the two.

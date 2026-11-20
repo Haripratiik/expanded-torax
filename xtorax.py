@@ -6,9 +6,9 @@ Run with a Python that has TORAX 1.4.3 (README.md, "Installation guide"), from t
 Commands
   env                                 check the environments, outside tools and data the twin needs, and what each enables
   versions                            the tested versions and the recommended one (natural.RECOMMENDED)
-  shots [--all]                       development shots with every file a whole-shot run needs (--all: also those that cannot be scored)
+  shots [--all]                       MAST shots with every file a whole-shot run needs (--all: also those that cannot be scored)
   run SHOT ... | --scorable [--version V] [--tag TAG] [--seeds N] [--lanes N] [--extra JSON]
-                                      whole MAST shots, hands-off from their first frame (development shots only); --scorable runs all 25 scorable shots;
+                                      whole MAST shots, hands-off from their first frame (listed shots only, when runs/twin/dev_shots.json exists); --scorable runs every scorable shot;
                                       --lanes splits them over N processes (tags TAGa, TAGb, ...); --extra adds override keys to the version's
   score TAG [--name NAME]             score runs against what MAST measured (whole_shot.py); TAG also takes in its lanes (TAGa, TAGb, ...) or a comma list
   ready NAME [--version V]            check a scored set against the written readiness criteria (readiness.py)
@@ -300,7 +300,7 @@ def cmd_smoke(a):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Expanded TORAX, a simulated tokamak and its harness: see README.md and AGENTS.md.")
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)   # --help prints the command table above
     sub = ap.add_subparsers(dest="command", required=True)
     p = sub.add_parser("env")
     p.add_argument("--port", type=int, default=8801)
