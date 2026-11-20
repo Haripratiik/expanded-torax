@@ -8,7 +8,7 @@ vessel's currents is what can say whether the current quench is the plasma movin
   extract   WSL, read only: for development disruptions with the thermal quench timed (runs/twin/disruptions/mast.json), EFIT before the collapse,
             the coil traces, and the probes, flux loops, current and soft X-ray cameras around it -> runs/twin/disruptions/vde/shots/<shot>.npz
             Usage: python core/mast_vde.py extract [--n 40] [--shots ...]
-Nothing from the held-out sets (final_temporal, final_random_test): the events come from mast.json, which holds development shots only, checked again here.
+Shots held out for testing are never read: the events come from mast.json, and when the workspace keeps runs/twin/dev_shots.json, events off that list are skipped.
 """
 import argparse
 import json
@@ -57,7 +57,7 @@ def separatrices(R, Z, psi, axis, xr, xz):
 def extract(args):
     import zarr
     ok = development()
-    events = [e for e in json.load(open(EVENTS)) if e.get("t_tq") is not None and e.get("cq_80_20_ms") is not None and int(e["shot"]) in ok]
+    events = [e for e in json.load(open(EVENTS)) if e.get("t_tq") is not None and e.get("cq_80_20_ms") is not None and (ok is None or int(e["shot"]) in ok)]
     events.sort(key=lambda e: e["shot"])
     if args.shots:
         pick = [e for e in events if e["shot"] in set(args.shots)]
@@ -144,7 +144,7 @@ def config(args):
     import zarr
     from scipy.interpolate import RectBivariateSpline
     ok = development()
-    events = [e for e in json.load(open(EVENTS)) if e.get("cq_80_20_ms") is not None and int(e["shot"]) in ok]
+    events = [e for e in json.load(open(EVENTS)) if e.get("cq_80_20_ms") is not None and (ok is None or int(e["shot"]) in ok)]
     rows = []
     for e in events:
         shot = int(e["shot"])

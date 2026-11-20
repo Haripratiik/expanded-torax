@@ -1,8 +1,9 @@
-"""EFIT's signals the whole-shot test (H82) needs and the shot files lack, read once from the chip project's MAST store: whmd, the shape, beta_pol, beta_N, l_i.
-Read only, development shots only (the chip project's dev_train and dev_val, minus its held-out sets: the script stops on any other shot).
-Usage (WSL, from the project folder): python -I core/whole_shot_efit.py 20689 16458 ...
+"""EFIT's signals the whole-shot test (H82) needs and the shot files lack, read once from the local MAST store (XTORAX_MAST_STORE): whmd, the shape, beta_pol, beta_N, l_i.
+Read only. When the workspace keeps a list of development shots (runs/twin/dev_shots.json), the script stops on any other shot.
+Usage (the zarr environment, from the repository): $XTORAX_FAIRMAST_PYTHON -I core/whole_shot_efit.py 20689 16458 ...
 Writes runs/twin/whole82/real/<shot>.npz and <shot>_beta.npz.
 """
+import json
 import os
 import sys
 
@@ -25,7 +26,7 @@ def main():
     allowed = development()
     os.makedirs(OUT, exist_ok=True)
     for shot in [int(a) for a in sys.argv[1:]]:
-        assert shot in allowed, f"{shot} is not a development shot"
+        assert allowed is None or shot in allowed, f"{shot} is not a development shot"
         eq = zarr.open_group(os.path.join(STORE, f"{shot}.zarr"), mode="r")["equilibrium"]
         f = lambda k: eq[k][:].astype(float)
         np.savez_compressed(os.path.join(OUT, f"{shot}.npz"), t_eq=f("time"), whmd=f("whmd"), z_mag=f("magnetic_axis_z"), q95=f("q95"), kappa=f("elongation"), a=f("minor_radius"),

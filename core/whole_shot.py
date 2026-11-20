@@ -19,7 +19,7 @@ Events, against the catalog: ELMs and sawtooth crashes as counts against time; i
 shot ends. Profiles: T_e and n_e against Thomson at the backtest's leads (the run's own record), beside holding.
 Usage: python -I core/whole_shot.py [--tags w82a,w82b,w82c] [--name h82]
        python -I core/whole_shot.py --compare h82,b1,v7      (named summaries side by side, and h83_compare.png)
-Writes runs/twin/whole82/summary.json (summary_<name>.json for another name) and docs/figures/h82_*.png (h83_<name>_*.png).
+Writes runs/twin/whole82/summary.json (summary_<name>.json for another name) and runs/twin/whole82/figures/h82_*.png (h83_<name>_*.png).
 Measured frames whose Thomson points stop short of rho 0.9 are left out of what Thomson gives (line density, thermal energy, profiles): the fit runs on unchecked past its last point (H83).
 Profiles come from the runs' saved profiles where every run has them (relative RMS over 0.1 < rho < 0.9, as shot.score), otherwise from the run's own score.
 """
@@ -37,7 +37,7 @@ ROOT = os.path.abspath(os.environ.get("XTORAX_HOME") or os.path.join(os.path.dir
 NAT = os.path.join(ROOT, "runs", "twin", "mast_natural2")
 EXTRAS = os.path.join(ROOT, "runs", "twin", "mast_natural", "extras")
 REAL = os.path.join(ROOT, "runs", "twin", "whole82", "real")
-FIG = os.path.join(ROOT, "docs", "figures")
+FIG = os.path.join(ROOT, "runs", "twin", "whole82", "figures")
 TAGS = ("w82a", "w82b", "w82c")
 NAME = "h82"
 COVER = 0.9          # rho_norm a Thomson slice must reach to count (mast.edge_cover)
@@ -425,6 +425,7 @@ def profiles(runs):
 
 
 def draw_profiles(out, runs):
+    os.makedirs(FIG, exist_ok=True)
     print("profiles, relative RMS over the minor radius at leads " + " ".join(f"{1e3 * v:.0f}" for v in LEADS_S) + " ms (twin | holding)")
     for c, e in out.items():
         f = lambda v: f"{100 * v:4.0f}%" if np.isfinite(v) else "   - "
@@ -661,6 +662,7 @@ def common_support(names):
 def compare(names):
     """Named summaries side by side: the effects at 50, 100, 150, 200 ms, the share inside the bar, events and the twin's own disruptions."""
     S = {n: json.load(open(out_summary(n))) for n in names}
+    os.makedirs(FIG, exist_ok=True)
     w = 9
     print("median error at 50 / 100 / 150 / 200 ms, then inside 10% and nearer than holding, per version: " + ", ".join(names))
     for k in S[names[0]]["effects"]:
