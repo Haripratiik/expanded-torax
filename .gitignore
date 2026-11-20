@@ -10,3 +10,6 @@ __pycache__/
 .venv/
 venv/
 .ipynb_checkpoints/
+
+# Hallmark's working records (before/after lint, deal log)
+.hallmark/

@@ -2,7 +2,10 @@
 "use strict";
 const $ = id => document.getElementById(id);
 const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-const MONO = '9.5px "B612 Mono", Consolas, monospace';
+// each pen's dash (--dash-N, "none" for a solid line) and a key swatch drawn with it, so pens one hue apart still read apart
+const dashOf = n => { const v = css(`--dash-${n}`); return v && v !== "none" ? v.split(/\s+/).map(Number) : []; };
+const swatch = n => { const c = css(`--s${n}`), d = dashOf(n); if (!d.length) return c; let x = 0; const stops = d.map((len, j) => { const s = `${j % 2 ? "transparent" : c} ${x}px ${x + len}px`; x += len; return s; }); return `repeating-linear-gradient(90deg, ${stops.join(", ")})`; };
+const MONO = '11px "Martian Mono", ui-monospace, monospace';
 const fmt = (v, d = 3) => v == null || !isFinite(v) ? "-" : Math.abs(v) >= 1e4 || (v !== 0 && Math.abs(v) < 1e-2) ? v.toExponential(2) : +v.toPrecision(d) + "";
 
 const S = { rev: -1, n: 0, nf: 0, t: [], data: {}, frames: [], meta: null, st: {}, cursor: null, pinned: false, window: 30, zoom: null, active: [], heat: "T_e", tab: "Instabilities", ghost: null, dirty: true, pf4: "chi", measured: null, measuredAt: null, flash: { elm: -1e9, saw: -1e9 }, hits: {}, counts: {} };
@@ -46,16 +49,17 @@ async function api(path, body) {
   const r = await fetch(path, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   return r.json();
 }
-function toast(text) {
+function toast(text, error = false) {
   const el = $("toast");
   el.textContent = text;
+  el.classList.toggle("error", !!error);
   el.hidden = false;
   clearTimeout(toast.timer);
   toast.timer = setTimeout(() => (el.hidden = true), 5000);
 }
 async function send(c) {
   const a = await api("/api/command", c);
-  if (a.error) toast(a.error);
+  if (a.error) toast(a.error, true);
   else if (a.scheduled !== undefined) toast(`${c.cmd} scheduled at ${fmt(a.scheduled, 5)} s`);
   S.dirty = true;
   return a;
@@ -290,7 +294,7 @@ function drawStrips(R, cursorT) {
     const top = 5, bot = h - 3;
     const Y = y => bot - (y - lo) / (hi - lo) * (bot - top);
     g.font = MONO; g.lineWidth = 1; g.strokeStyle = col.grid; g.fillStyle = col.ink3; g.textBaseline = "middle"; g.textAlign = "right";
-    for (const y of ticks(lo, hi, d.small ? 2 : 3)) { hline(g, PAD.l, w - PAD.r, Y(y)); g.fillText(Math.abs(y) >= 1000 ? (y / 1000) + "K" : +y.toPrecision(3), PAD.l - 4, Y(y)); }
+    for (const y of ticks(lo, hi, d.small ? 2 : 3)) { hline(g, PAD.l, w - PAD.r, Y(y)); g.fillText(Math.abs(y) >= 1000 ? (y / 1000) + "K" : +y.toPrecision(3), PAD.l - 4, Math.min(bot - 6, Math.max(top + 6, Y(y)))); }
     for (const x of ticks(R[0], R[1], 6)) vline(g, X(x, R, w), top, bot);
     if (d.dyn === "w_") {          // locks shaded
       g.fillStyle = col.crit; g.globalAlpha = .12;
@@ -304,7 +308,8 @@ function drawStrips(R, cursorT) {
       for (const k of keys) { const v = gh.map(r => r[k] == null ? NaN : r[k]); pen(g, tg, v, scaleOf(k), R, w, Y, d.step); }
     }
     g.lineWidth = 1.5;
-    for (const k of keys) { g.strokeStyle = css(`--s${slotOf(k)}`); pen(g, t, S.data[k], scaleOf(k), R, w, Y, d.step); }
+    for (const k of keys) { g.strokeStyle = css(`--s${slotOf(k)}`); g.setLineDash(dashOf(slotOf(k))); pen(g, t, S.data[k], scaleOf(k), R, w, Y, d.step); }
+    g.setLineDash([]);
     g.fillStyle = col.measured;
     for (const [rt, rv, sc] of mine) for (let i = 0; i < rv.length; i++) if (rv[i] != null && rt[i] >= R[0] && rt[i] <= R[1]) g.fillRect(X(rt[i], R, w) - 1, Y(rv[i] * sc) - 1, 2, 2);
     // the track's header: the reading, and the key that goes with it. The colour sits on the key, the words stay in ink
@@ -316,7 +321,7 @@ function drawStrips(R, cursorT) {
     for (const k of keys) {
       const row = document.createElement("div"), s = document.createElement("span"), i = document.createElement("i"), v = document.createElement("em");
       row.className = "ch";
-      i.style.background = css(`--s${slotOf(k)}`);
+      i.style.background = swatch(slotOf(k));
       s.append(i, document.createTextNode(labelOf(k)));
       v.textContent = fmt(S.data[k][at] * scaleOf(k));
       row.append(s, v);
@@ -370,7 +375,7 @@ function tip(e) {
   const h = document.createElement("div"); h.className = "t"; h.textContent = `${fmt(S.t[i], 5)} s`; el.append(h);
   for (const k of keysOf(d)) {
     const row = document.createElement("div"), key = document.createElement("i"), val = document.createElement("b");
-    key.style.background = css(`--s${slotOf(k)}`);
+    key.style.background = swatch(slotOf(k));
     val.textContent = fmt(S.data[k][i] * scaleOf(k), 4);
     row.append(key, val, document.createTextNode(` ${labelOf(k)}`));
     el.append(row);
@@ -387,8 +392,8 @@ function drawRug(R, cursorT) {
   const i0 = Math.max(lower(t, R[0]), 0), i1 = lower(t, R[1]) + 1;
   g.lineWidth = 1;
   const marks = (key, color, top) => { const v = S.data[key]; if (!v) return; g.strokeStyle = css(color); for (let i = i0; i < Math.min(i1, t.length); i++) if (v[i] > 0) vline(g, X(t[i], R, w), top, h - 1); };
-  marks("elm", "--s4", h - 7);
-  marks("sawtooth", "--s7", h - 12);
+  marks("elm", "--s3", h - 7);
+  marks("sawtooth", "--ink", h - 14);
   g.font = MONO; g.textBaseline = "top"; g.textAlign = "left"; g.fillStyle = css("--ink");
   let lastX = -1e9;
   const st = S.st;
@@ -414,11 +419,14 @@ function drawAxis(R) {
 }
 
 // ---------- heat map and colours
-const RAMP = ["#0d0604", "#2c0e08", "#5e170c", "#9a2b0f", "#d24b14", "#f2801f", "#f9b45a", "#fde3b0", "#fff8ea"];
-const hex = c => [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)];
+// the plasma's ramp is the stylesheet's, --plasma-0 (cold edge) to --plasma-8 (hot core); a 1 px canvas turns any CSS colour into RGB
+const toRGB = (() => { const c = document.createElement("canvas").getContext("2d", { willReadFrequently: true }); c.canvas.width = c.canvas.height = 1; return col => { c.clearRect(0, 0, 1, 1); c.fillStyle = col; c.fillRect(0, 0, 1, 1); const d = c.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2]]; }; })();
+let RAMP = null;
+const ramp = () => RAMP || (RAMP = Array.from({ length: 9 }, (_, i) => toRGB(css(`--plasma-${i}`))));
 function rampAt(u) {
-  u = Math.max(0, Math.min(1, u)) * (RAMP.length - 1);
-  const i = Math.min(Math.floor(u), RAMP.length - 2), f = u - i, a = hex(RAMP[i]), b = hex(RAMP[i + 1]);
+  const RG = ramp();
+  u = Math.max(0, Math.min(1, u)) * (RG.length - 1);
+  const i = Math.min(Math.floor(u), RG.length - 2), f = u - i, a = RG[i], b = RG[i + 1];
   return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
 }
 function fieldOf(f, k) { return f[k] || null; }
@@ -448,17 +456,17 @@ function drawHeat(R) {
   g.drawImage(off, PAD.l, top, pw, bot - top);
   const Y = rho => bot - rho * (bot - top);
   g.font = MONO; g.fillStyle = css("--ink-3"); g.textAlign = "right"; g.textBaseline = "middle";
-  for (const y of [0, .5, 1]) g.fillText(y, PAD.l - 4, Y(y));
+  for (const y of [0, .5, 1]) g.fillText(y, PAD.l - 4, Math.min(bot - 6, Math.max(top + 6, Y(y))));
   // islands on top of it
   const a = S.meta && S.meta.geometry ? S.meta.geometry.a : 2;
-  g.strokeStyle = "#ffffff"; g.lineWidth = 1;
+  g.strokeStyle = css("--ink"); g.lineWidth = 1;
   const tracks = {};
   for (let i = i0; i < i1; i += Math.max(1, Math.floor((i1 - i0) / pw))) for (const isl of F[i].islands || []) { if (isl.rho == null) continue; (tracks[`${isl.m}/${isl.n}`] ||= []).push([F[i].t, isl.rho, isl.w]); }
   for (const pts of Object.values(tracks)) {
     g.setLineDash([3, 3]);
     g.beginPath(); pts.forEach(([t, r], i) => { const x = X(t, R, w); i ? g.lineTo(x, Y(r)) : g.moveTo(x, Y(r)); }); g.stroke();
     g.setLineDash([]);
-    for (const [t, r, wd] of pts) if (wd > 0) { const x = X(t, R, w), half = wd / (2 * a); g.strokeStyle = "#ffffff"; vline(g, x, Y(r + half), Y(r - half)); }
+    for (const [t, r, wd] of pts) if (wd > 0) { const x = X(t, R, w), half = wd / (2 * a); g.strokeStyle = css("--ink"); vline(g, x, Y(r + half), Y(r - half)); }
   }
   $("heat-note").textContent = `${fmt(lo)} to ${fmt(hi)} ${HEAT[k][1]}, bright is high. White: rational surfaces and islands`;
   if (S.cursor != null) { g.strokeStyle = css("--ink"); vline(g, X(S.cursor, R, w), top, bot); }
@@ -519,13 +527,13 @@ function drawProfiles(t) {
     for (const q of pts) if (isFinite(q[1]) && q[1] < hi) { g.fillStyle = css("--measured"); g.fillRect(Xr(Math.min(q[0], 1)) - 1, Y(q[1]) - 1, 2, 2); }
     g.lineJoin = g.lineCap = "round";
     for (const s of series) {
-      g.strokeStyle = css(`--s${s[2]}`); g.lineWidth = 2; g.beginPath();
+      g.strokeStyle = css(`--s${s[2]}`); g.lineWidth = 2; g.setLineDash(dashOf(s[2])); g.beginPath();
       s[1].forEach((y, i) => { const px = Xr(knots[i]), py = Y(Math.min(y, hi)); i ? g.lineTo(px, py) : g.moveTo(px, py); });
-      g.stroke();
+      g.stroke(); g.setLineDash([]);
     }
     for (const isl of f.islands || []) if (isl.w > 0 && isl.rho != null && (S.meta.geometry)) { const half = isl.w / (2 * S.meta.geometry.a); g.fillStyle = css("--critical"); g.globalAlpha = .13; g.fillRect(Xr(isl.rho - half), top, Xr(isl.rho + half) - Xr(isl.rho - half), bot - top); g.globalAlpha = 1; }
     h.replaceChildren(document.createTextNode(p.select ? "" : p.title));
-    for (const s of series) { const sp = document.createElement("span"), i = document.createElement("i"); i.style.background = css(`--s${s[2]}`); sp.append(i, document.createTextNode(s[0])); h.append(sp); }
+    for (const s of series) { const sp = document.createElement("span"), i = document.createElement("i"); i.style.background = swatch(s[2]); sp.append(i, document.createTextNode(s[0])); h.append(sp); }
     if (pts.length) { const sp = document.createElement("span"); sp.textContent = "white: measured"; h.append(sp); }
   }
 }
@@ -535,7 +543,7 @@ function profTip(e, box) {
   const r = cv.getBoundingClientRect(), rho = Math.max(0, Math.min(1, (e.clientX - r.left - 30) / (r.width - 36))), i = Math.round(rho * 40);
   el.replaceChildren();
   const h = document.createElement("div"); h.className = "t"; h.textContent = `rho ${rho.toFixed(2)}`; el.append(h);
-  for (const s of profSeries(p, f)) { const row = document.createElement("div"), k = document.createElement("i"), b = document.createElement("b"); k.style.background = css(`--s${s[2]}`); b.textContent = fmt(s[1][i], 4); row.append(k, b, document.createTextNode(` ${s[0]}`)); el.append(row); }
+  for (const s of profSeries(p, f)) { const row = document.createElement("div"), k = document.createElement("i"), b = document.createElement("b"); k.style.background = swatch(s[2]); b.textContent = fmt(s[1][i], 4); row.append(k, b, document.createTextNode(` ${s[0]}`)); el.append(row); }
   el.hidden = false; el.style.left = Math.min(e.clientX + 14, innerWidth - 200) + "px"; el.style.top = e.clientY + 12 + "px";
 }
 async function fetchMeasured() {
@@ -563,14 +571,14 @@ function drawXsec(t, now) {
   const outline = (pts, close = true) => { g.beginPath(); pts.forEach(([R, Z], j) => { const [x, y] = P(R, Z); j ? g.lineTo(x, y) : g.moveTo(x, y); }); if (close) g.closePath(); };
   // the machine
   if (M) {
-    g.fillStyle = "#16140f"; for (const [R, Z, dR, dZ] of M.passive || []) { const [x, y] = P(R - dR / 2, Z + dZ / 2); g.fillRect(x, y, Math.max(dR * sc, 1), Math.max(dZ * sc, 1)); }
+    g.fillStyle = css("--bg-2"); for (const [R, Z, dR, dZ] of M.passive || []) { const [x, y] = P(R - dR / 2, Z + dZ / 2); g.fillRect(x, y, Math.max(dR * sc, 1), Math.max(dZ * sc, 1)); }
     g.strokeStyle = css("--rule-2"); g.lineWidth = 1; if (M.wall) { outline(M.wall); g.stroke(); }
     const now_I = (shape && shape.coils_A) || {}, Imax = Math.max(1, ...Object.values(now_I).map(Math.abs));
     for (const c of M.coils || []) {
       const [x, y] = P(c.R - c.dR / 2, c.Z + c.dZ / 2), I = now_I[c.name], cw = Math.max(c.dR * sc, 2), ch = Math.max(c.dZ * sc, 2);
-      g.fillStyle = "#1d1b18";
-      if (I != null) { const a = Math.min(1, Math.abs(I) / Imax); g.fillStyle = I >= 0 ? `rgba(57,135,229,${.18 + .72 * a})` : `rgba(217,89,38,${.18 + .72 * a})`; }
-      g.fillRect(x, y, cw, ch);
+      g.fillStyle = css("--bg-3");
+      if (I != null) { const a = Math.min(1, Math.abs(I) / Imax); g.fillStyle = I >= 0 ? css("--coil-pos") : css("--coil-neg"); g.globalAlpha = .18 + .72 * a; }
+      g.fillRect(x, y, cw, ch); g.globalAlpha = 1;
     }
   } else {
     const wallR = G.a * 1.2, wallZ = G.a * edgeK * 1.2;
@@ -591,21 +599,21 @@ function drawXsec(t, now) {
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const age = e => still ? 1e9 : now - e, elm = Math.exp(-age(S.flash.elm) / 220), saw = Math.exp(-age(S.flash.saw) / 160);
   g.save();
-  g.shadowColor = css("--dalpha"); g.shadowBlur = 10 + 34 * elm; g.strokeStyle = `rgba(255,70,120,${.42 + .58 * elm})`; g.lineWidth = 1 + 2 * elm;
+  g.strokeStyle = css("--dalpha"); g.globalAlpha = .42 + .58 * elm; g.lineWidth = 1 + 2 * elm;
   surface(last); g.stroke();
   g.restore();
-  if (saw > .02) { const q1 = Math.max(2, Math.round(last * .38)); g.save(); g.globalAlpha = .75 * saw; g.fillStyle = "#fffdf5"; surface(q1); g.fill(); g.restore(); }
+  if (saw > .02) { const q1 = Math.max(2, Math.round(last * .38)); g.save(); g.globalAlpha = .75 * saw; g.fillStyle = css("--ink"); surface(q1); g.fill(); g.restore(); }
   const [ax, ay] = point(0, 0);
-  g.strokeStyle = "rgba(0,0,0,.55)"; g.lineWidth = 1; g.beginPath(); g.moveTo(ax - 5, ay); g.lineTo(ax + 5, ay); g.moveTo(ax, ay - 5); g.lineTo(ax, ay + 5); g.stroke();
+  g.strokeStyle = css("--crosshair"); g.lineWidth = 1; g.beginPath(); g.moveTo(ax - 5, ay); g.lineTo(ax + 5, ay); g.moveTo(ax, ay - 5); g.lineTo(ax, ay + 5); g.stroke();
   // the free-boundary solver's own last closed surface, and what was measured
-  if (shape && shape.lcfs) { g.save(); g.setLineDash([4, 3]); g.strokeStyle = "#f4efe3"; g.lineWidth = 1; outline(shape.lcfs); g.stroke(); g.restore(); }
+  if (shape && shape.lcfs) { g.save(); g.setLineDash([4, 3]); g.strokeStyle = css("--ink-2"); g.lineWidth = 1; outline(shape.lcfs); g.stroke(); g.restore(); }
   if (measured) { g.save(); g.strokeStyle = css("--efit"); g.lineWidth = 1.25; outline(shape.measured_lcfs); g.stroke(); g.restore(); }
   // islands: a chain of m lobes on the surface, to scale in width; rotation slowed so it can be seen
   (f.islands || []).forEach(isl => {
     if (!(isl.w > 0) || isl.rho == null) return;
     const q = Math.max(1, Math.min(last, Math.round(isl.rho * last))), half = isl.w / 2, spin = (isl.f && Math.abs(isl.f) > 1 && !still) ? now * 3e-4 * Math.sign(isl.f) : 0;
     const th0 = (isl.phi || 0) / isl.m + spin, locked = isl.f != null && Math.abs(isl.f) < 1;
-    g.lineWidth = 1; g.strokeStyle = locked ? css("--critical") : "#f4efe3"; g.fillStyle = "#050505"; g.globalAlpha = .62;
+    g.lineWidth = 1; g.strokeStyle = locked ? css("--critical") : css("--ink"); g.fillStyle = css("--void"); g.globalAlpha = .62;
     g.beginPath();
     const steps = 180;
     for (let j = 0; j <= steps; j++) { const th = j / steps * 2 * Math.PI, d = half * Math.abs(Math.cos(isl.m * (th - th0) / 2)); const [x, y] = point(q, th, d); j ? g.lineTo(x, y) : g.moveTo(x, y); }
@@ -616,11 +624,11 @@ function drawXsec(t, now) {
   const gy = f.gyro;
   if (gy && gy.P > 0 && gy.aim != null) {
     const q = Math.max(1, Math.min(last, Math.round(gy.aim * last))), [x1, y1] = point(q, 1.0), [x0, y0] = P(Rc(last) + (G.R_out[last] - Rc(last)) * 1.1, z0 + G.a * edgeK * 1.12);
-    g.strokeStyle = css("--warn"); g.lineWidth = .75 + 2 * Math.min(1, gy.P / (gy.units * gy.unit_MW || 1)); g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
-    g.fillStyle = css("--warn"); g.fillRect(x1 - 2, y1 - 2, 4, 4);
+    g.strokeStyle = css("--beam"); g.lineWidth = .75 + 2 * Math.min(1, gy.P / (gy.units * gy.unit_MW || 1)); g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+    g.fillStyle = css("--beam"); g.fillRect(x1 - 2, y1 - 2, 4, 4);
   }
   // shards, along the outboard midplane
-  g.fillStyle = "#fffdf5";
+  g.fillStyle = css("--ink");
   for (const s of f.shards || []) s.x.forEach((d, i) => { if (s.r[i] > 0) { const [x, y] = P(G.R_out[last] - d, z0 + (i - 3) * .04 * G.a); g.fillRect(x - 1.5, y - 1.5, 3, 3); } });
   // gas, at the edge
   const gas = S.data.gas_rate, seed = S.data.seed_rate;
@@ -776,7 +784,7 @@ function logPanel() {
   const row = document.createElement("div"); row.className = "go";
   const name = document.createElement("input"); name.placeholder = "shot name"; name.style.flex = "1"; name.setAttribute("aria-label", "Name to save the shot under");
   const save = document.createElement("button"); save.textContent = "Save shot"; save.className = "fire";
-  save.onclick = async () => { const a = await api("/api/save", { name: name.value || `shot_${Date.now()}` }); toast(a.path ? `Saved ${a.path}` : a.error); savedList(); };
+  save.onclick = async () => { const a = await api("/api/save", { name: name.value || `shot_${Date.now()}` }); toast(a.path ? `Saved ${a.path}` : a.error, !a.path); savedList(); };
   row.append(name, save); box.append(row);
   const dl = document.createElement("div"); dl.className = "go";
   for (const [text, href] of [["Traces, CSV", "/api/csv"], ["Scenario and commands, JSON", "/api/export"]]) { const a = document.createElement("a"); a.textContent = text; a.href = href; a.download = ""; a.style.fontSize = "11.5px"; a.style.color = "var(--ink)"; dl.append(a); }
@@ -841,8 +849,8 @@ $("heat-field").onchange = e => { S.heat = e.target.value; S.dirty = true; };
 $("add-strip").onclick = () => { $("strip-menu").hidden = !$("strip-menu").hidden; };
 $("pin-clear").onclick = () => { S.pinned = false; S.cursor = null; S.zoom = null; S.measured = null; $("pin-clear").hidden = true; S.dirty = true; };
 let marks = 0;
-$("branch").onclick = async () => { marks += 1; const a = await api("/api/branch", { name: `mark ${marks}` }); toast(a.error || `mark ${marks} at ${fmt(a.t, 5)} s`); };
-$("rewind").onclick = async () => { const n = $("branches").value; if (!n) return toast("no mark to go back to"); const a = await api("/api/rewind", { name: n }); if (a.error) toast(a.error); else { const q = S.st.ghosts ? S.st.ghosts.length : 0; S.ghost = await api(`/api/ghost?i=${q}`); } };
+$("branch").onclick = async () => { marks += 1; const a = await api("/api/branch", { name: `mark ${marks}` }); toast(a.error || `mark ${marks} at ${fmt(a.t, 5)} s`, !!a.error); };
+$("rewind").onclick = async () => { const n = $("branches").value; if (!n) return toast("no mark to go back to", true); const a = await api("/api/rewind", { name: n }); if (a.error) toast(a.error, true); else { const q = S.st.ghosts ? S.st.ghosts.length : 0; S.ghost = await api(`/api/ghost?i=${q}`); } };
 addEventListener("keydown", e => {
   if (e.target.closest("input, select, textarea")) return;
   if (e.code === "Space") { e.preventDefault(); $("run").click(); }
